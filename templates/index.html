@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KandyTrail</title>
+</head>
+<body>
+    <h1>KandyTrail</h1>
+
+    <h2>Explore by type</h2>
+    <ul>
+        {% for category in categories %}
+            <li>{{ category.name }}</li>
+        {% endfor %}
+    </ul>
+
+    <h2>Popular places</h2>
+    {% if places %}
+        {% for place in places %}
+            <div>
+                <h3>{{ place.name }}</h3>
+                <p>{{ place.sub_type or place.category }} · {{ place.distance_km }} km</p>
+                <p>{{ place.short_description }}</p>
+            </div>
+        {% endfor %}
+    {% else %}
+        <p>No places available yet.</p>
+    {% endif %}
+</body>
+</html>
