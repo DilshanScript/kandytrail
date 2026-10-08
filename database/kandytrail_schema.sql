@@ -27,6 +27,7 @@ CREATE TABLE places (
     sub_type_id        INT NULL,
     short_description  VARCHAR(300),
     description        TEXT,
+    keywords           VARCHAR(300),
     latitude           DECIMAL(9,6),
     longitude          DECIMAL(9,6),
     distance_km        DECIMAL(5,1),
@@ -104,30 +105,35 @@ INSERT INTO sub_types (category_id, name) VALUES
 -- Sample places
 INSERT INTO places
 (name, category_id, sub_type_id, short_description, latitude, longitude, distance_km,
- opening_hours, visit_duration_min, price_level, entry_fee, travel_tips)
+ opening_hours, visit_duration_min, price_level, entry_fee, travel_tips, keywords)
 VALUES
 ('Sri Dalada Maligawa (Temple of the Tooth)', 1, 1,
  'UNESCO World Heritage temple that houses the sacred Tooth Relic of the Buddha.',
  7.293600, 80.641300, 11, 'Daily 5:30am - 8:00pm', 90, 'Budget',
  'Free for locals, ticket for foreign visitors',
- 'Wear white or light clothes that cover shoulders and knees. Shoes are removed at the entrance.'),
+ 'Wear white or light clothes that cover shoulders and knees. Shoes are removed at the entrance.',
+ 'tooth relic, buddhist, unesco, perahera, palace, worship'),
 
 ('Sri Maha Bodhi Viharaya (Bahirawakanda)', 1, 1,
  'Hilltop temple with an 88-foot white Buddha statue and views over Kandy city.',
  7.295500, 80.629000, 11, 'Daily 6:00am - 6:00pm', 45, 'Budget',
- 'Small ticket', 'Best views in the early morning or near sunset.'),
+ 'Small ticket', 'Best views in the early morning or near sunset.',
+ 'buddha statue, viewpoint, hill, city view, buddhist'),
 
 ('Royal Botanic Gardens, Peradeniya', 2, 6,
  'Historic 147-acre garden with orchids, giant bamboo and the famous Java fig tree.',
  7.268300, 80.596700, 13, 'Daily 7:30am - 5:00pm', 120, 'Budget',
- 'Ticket (lower price for locals)', 'Bring water and wear comfortable shoes, the garden is large.'),
+ 'Ticket (lower price for locals)', 'Bring water and wear comfortable shoes, the garden is large.',
+ 'botanical, flowers, orchids, trees, picnic, family, walking'),
 
 ('Kandy Lake', 2, 5,
  'Historic lake in the centre of Kandy with a 3.4 km walking path.',
  7.291500, 80.645000, 11, 'Open all day', 45, 'Free',
- 'Free', 'Walk the path in the evening when it is cooler.'),
+ 'Free', 'Walk the path in the evening when it is cooler.',
+ 'walking, evening, city centre, photos, relax'),
 
 ('Hela Bojun Hala - Gannoruwa', 5, 14,
  'Traditional Sri Lankan food centre with fresh local dishes and herbal drinks at low prices.',
  7.281000, 80.592000, 11, 'Daily 7:00am - 7:00pm', 45, 'Budget',
- 'Pay for what you eat', 'Try the hoppers and herbal porridge. Busy around lunchtime.');
+ 'Pay for what you eat', 'Try the hoppers and herbal porridge. Busy around lunchtime.',
+ 'lunch, sri lankan food, rice and curry, hoppers, cheap, vegetarian');

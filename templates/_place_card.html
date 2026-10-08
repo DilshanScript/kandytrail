@@ -1,0 +1,18 @@
+<div class="place-card" data-category="{{ place.category_id }}" data-sub-type="{{ place.sub_type_id or '' }}">
+    <div class="place-photo">
+        {% if place.image_file %}
+            <img src="{{ url_for('static', filename='images/places/' ~ place.image_file) }}" alt="{{ place.name }}">
+        {% endif %}
+        <button type="button" class="save-btn" data-place="{{ place.place_id }}" aria-label="Save place">
+            <svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z"/></svg>
+        </button>
+        <span class="rating">
+            {% if place.rating %}&#9733; {{ place.rating }}{% else %}New{% endif %}
+        </span>
+    </div>
+    <a href="#" class="place-body">
+        <h3>{{ place.name }}</h3>
+        <span class="place-tag">{{ place.sub_type or place.category }} &middot; {{ place.distance_km|round|int }} km</span>
+        <p>{{ place.short_description }}</p>
+    </a>
+</div>

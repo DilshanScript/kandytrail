@@ -15,13 +15,58 @@
     </div>
 
     <div class="search-row">
-        <form class="search-box" action="#" method="get">
+        <form class="search-box" action="{{ url_for('places') }}" method="get">
             <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
-            <input type="text" name="q" placeholder="Search places">
+            <input type="text" name="q" placeholder="Search places" autocomplete="off">
+            <button type="submit" class="search-submit" aria-label="Search">
+                <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            </button>
         </form>
-        <a href="#" class="filter-btn" aria-label="Filters">
+        <button type="button" class="filter-btn" id="filterBtn" aria-label="Filters" aria-expanded="false">
             <svg viewBox="0 0 24 24"><circle cx="7" cy="7" r="2.5"/><path d="M12 7h8"/><circle cx="17" cy="17" r="2.5"/><path d="M4 17h8"/></svg>
-        </a>
+        </button>
+
+        <div class="filter-panel" id="filterPanel" hidden>
+            <div class="panel-backdrop" data-close></div>
+            <form class="panel" action="{{ url_for('places') }}" method="get">
+                <div class="panel-head">
+                    <h3>Filters</h3>
+                    <button type="button" class="panel-close" data-close aria-label="Close">
+                        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>
+                    </button>
+                </div>
+
+                <span class="panel-label">Category</span>
+                <div class="panel-options">
+                    {% for category in categories %}
+                        <label class="option">
+                            <input type="radio" name="category" value="{{ category.category_id }}">
+                            <span>
+                                <img src="{{ url_for('static', filename='images/categories/' ~ category.name|lower ~ '.png') }}" alt="" onerror="this.remove()">
+                                {{ category.name }}
+                            </span>
+                        </label>
+                    {% endfor %}
+                </div>
+
+                <div class="panel-types" id="panelTypes" hidden>
+                    <span class="panel-label">Type</span>
+                    <div class="panel-options">
+                        {% for sub in sub_types %}
+                            <label class="option" data-category="{{ sub.category_id }}" hidden>
+                                <input type="radio" name="sub_type" value="{{ sub.sub_type_id }}">
+                                <span>{{ sub.name }}</span>
+                            </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="panel-actions">
+                    <button type="reset" class="btn btn-light">Reset</button>
+                    <button type="submit" class="btn btn-primary" id="panelSubmit">Show places</button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <div class="hero">
@@ -66,24 +111,7 @@
     {% if places %}
         <div class="place-row" id="placeRow">
             {% for place in places %}
-                <div class="place-card" data-category="{{ place.category_id }}">
-                    <div class="place-photo">
-                        {% if place.image_file %}
-                            <img src="{{ url_for('static', filename='images/places/' ~ place.image_file) }}" alt="{{ place.name }}">
-                        {% endif %}
-                        <button type="button" class="save-btn" data-place="{{ place.place_id }}" aria-label="Save place">
-                            <svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z"/></svg>
-                        </button>
-                        <span class="rating">
-                            {% if place.rating %}&#9733; {{ place.rating }}{% else %}New{% endif %}
-                        </span>
-                    </div>
-                    <a href="#" class="place-body">
-                        <h3>{{ place.name }}</h3>
-                        <span class="place-tag">{{ place.sub_type or place.category }} &middot; {{ place.distance_km|round|int }} km</span>
-                        <p>{{ place.short_description }}</p>
-                    </a>
-                </div>
+                {% include "_place_card.html" %}
             {% endfor %}
         </div>
         <p class="empty" id="noPlaces" hidden>No places in this category yet.</p>
@@ -98,7 +126,7 @@
                     <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
                 </button>
             </div>
-            <a href="#" class="see-all">See all
+            <a href="{{ url_for('places') }}" class="see-all explore-link">See all
                 <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
             </a>
         </div>

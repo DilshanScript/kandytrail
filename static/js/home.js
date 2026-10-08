@@ -57,26 +57,55 @@ categoryButtons.forEach(button => {
             card.hidden = selected !== null && card.dataset.category !== selected;
         });
 
+        // open the places page with the same category
+        document.querySelectorAll(".explore-link").forEach(link => {
+            link.href = selected ? `/places?category=${selected}` : "/places";
+        });
+
         noPlaces.hidden = visibleCards().length > 0;
         row.scrollLeft = 0;
         updateCount();
     });
 });
 
-// saved places are kept in the browser until user accounts are added
-const saved = new Set(JSON.parse(localStorage.getItem("savedPlaces") || "[]"));
+// filter panel
+const filterBtn = document.getElementById("filterBtn");
+const filterPanel = document.getElementById("filterPanel");
+const panelForm = filterPanel.querySelector("form");
+const panelTypes = document.getElementById("panelTypes");
+const panelSubmit = document.getElementById("panelSubmit");
+const allCards = document.querySelectorAll(".place-card");
 
-document.querySelectorAll(".save-btn").forEach(button => {
-    if (saved.has(button.dataset.place)) button.classList.add("saved");
+function openPanel(open) {
+    filterPanel.hidden = !open;
+    filterBtn.setAttribute("aria-expanded", open);
+}
 
-    button.addEventListener("click", () => {
-        const id = button.dataset.place;
-        if (saved.has(id)) {
-            saved.delete(id);
-        } else {
-            saved.add(id);
-        }
-        button.classList.toggle("saved");
-        localStorage.setItem("savedPlaces", JSON.stringify([...saved]));
+// show the types of the picked category and count matching places
+function updatePanel() {
+    const category = panelForm.category.value;
+    const typeInput = panelForm.querySelector("input[name='sub_type']:checked");
+
+    panelTypes.querySelectorAll(".option").forEach(option => {
+        option.hidden = option.dataset.category !== category;
+        if (option.hidden) option.querySelector("input").checked = false;
     });
+    panelTypes.hidden = !category || !panelTypes.querySelector(".option:not([hidden])");
+
+    const type = typeInput && !typeInput.closest(".option").hidden ? typeInput.value : "";
+    const count = [...allCards].filter(card =>
+        (!category || card.dataset.category === category) &&
+        (!type || card.dataset.subType === type)
+    ).length;
+    panelSubmit.textContent = `Show ${count} place${count === 1 ? "" : "s"}`;
+}
+
+filterBtn.addEventListener("click", () => openPanel(filterPanel.hidden));
+filterPanel.querySelectorAll("[data-close]").forEach(el => el.addEventListener("click", () => openPanel(false)));
+document.addEventListener("keydown", event => {
+    if (event.key === "Escape") openPanel(false);
 });
+
+panelForm.addEventListener("change", updatePanel);
+panelForm.addEventListener("reset", () => setTimeout(updatePanel));
+updatePanel();

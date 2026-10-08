@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}Explore places - KandyTrail{% endblock %}
+
+{% block content %}
+<section class="page-head">
+    <h1>Explore places</h1>
+    <p>Find places to visit around Kandy</p>
+</section>
+
+<form class="search-row places-search" action="{{ url_for('places') }}" method="get">
+    <div class="search-box">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+        <input type="text" name="q" value="{{ q }}" placeholder="Search places" autocomplete="off">
+    </div>
+    {% if category_id %}<input type="hidden" name="category" value="{{ category_id }}">{% endif %}
+    <button type="submit" class="filter-btn search-go" aria-label="Search">
+        <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    </button>
+</form>
+
+<section class="section">
+    <div class="category-row">
+        {% for category in categories %}
+            {% if category.category_id == category_id %}
+                <a href="{{ url_for('places', q=q or None) }}" class="category active">
+            {% else %}
+                <a href="{{ url_for('places', q=q or None, category=category.category_id) }}" class="category">
+            {% endif %}
+                <span class="category-icon">
+                    <img src="{{ url_for('static', filename='images/categories/' ~ category.name|lower ~ '.png') }}" alt="" onerror="this.classList.add('missing')" onload="this.classList.remove('missing')">
+                </span>
+                <span class="category-name">{{ category.name }}</span>
+            </a>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="results">
+    {% set selected_category = categories|selectattr("category_id", "equalto", category_id)|first %}
+    {% set selected_type = sub_types|selectattr("sub_type_id", "equalto", sub_type_id)|first %}
+    <div class="results-bar">
+        <div class="results-info">
+            <span>{{ places|length }} place{% if places|length != 1 %}s{% endif %} found</span>
+            {% if q %}<span class="tag">&ldquo;{{ q }}&rdquo;</span>{% endif %}
+            {% if selected_category %}<span class="tag">{{ selected_category.name }}</span>{% endif %}
+            {% if selected_type %}<span class="tag">{{ selected_type.name }}</span>{% endif %}
+            {% if q or category_id %}
+                <a href="{{ url_for('places') }}" class="clear-link">Clear</a>
+            {% endif %}
+        </div>
+
+        {% if sub_types %}
+            <div class="dropdown">
+                <button type="button" class="dropdown-btn" aria-haspopup="true" aria-expanded="false">
+                    <span>{{ selected_type.name if selected_type else "All types" }}</span>
+                    <svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a href="{{ url_for('places', q=q or None, category=category_id) }}" {% if not sub_type_id %}class="active"{% endif %}>All types</a></li>
+                    {% for sub in sub_types %}
+                        <li><a href="{{ url_for('places', q=q or None, category=category_id, sub_type=sub.sub_type_id) }}" {% if sub.sub_type_id == sub_type_id %}class="active"{% endif %}>{{ sub.name }}</a></li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+    </div>
+
+    {% if places %}
+        <div class="place-grid">
+            {% for place in places %}
+                {% include "_place_card.html" %}
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="empty">No places found. Try another search or clear the filters.</p>
+    {% endif %}
+</section>
+{% endblock %}

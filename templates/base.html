@@ -20,9 +20,9 @@
             </a>
 
             <nav class="top-nav">
-                <a href="{{ url_for('home') }}" class="active">Home</a>
+                <a href="{{ url_for('home') }}" {% if request.endpoint == 'home' %}class="active"{% endif %}>Home</a>
                 <a href="#">My trip</a>
-                <a href="#">Explore</a>
+                <a href="{{ url_for('places') }}" class="explore-link {% if request.endpoint == 'places' %}active{% endif %}">Explore</a>
                 <a href="#">Saved</a>
             </nav>
 
@@ -54,7 +54,7 @@
     </footer>
 
     <nav class="bottom-nav">
-        <a href="{{ url_for('home') }}" class="active">
+        <a href="{{ url_for('home') }}" {% if request.endpoint == 'home' %}class="active"{% endif %}>
             <svg viewBox="0 0 24 24"><path d="M3 11 12 4l9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>
             <span>Home</span>
         </a>
@@ -62,8 +62,8 @@
             <svg viewBox="0 0 24 24"><circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M8 18h8a3 3 0 0 0 0-6H8a3 3 0 0 1 0-6h8"/></svg>
             <span>My trip</span>
         </a>
-        <a href="#">
-            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></svg>
+        <a href="{{ url_for('places') }}" class="explore-link {% if request.endpoint == 'places' %}active{% endif %}">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path class="needle" d="m15.5 8.5-2 5-5 2 2-5z"/></svg>
             <span>Explore</span>
         </a>
         <a href="#">
@@ -73,6 +73,7 @@
     </nav>
 
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/search.js') }}"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>
