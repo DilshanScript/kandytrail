@@ -1,8 +1,8 @@
 from datetime import date
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, abort, jsonify, render_template, request
 
-from db import query_all
+from db import query_all, query_one
 
 app = Flask(__name__)
 
@@ -94,7 +94,7 @@ def suggest():
 
     # names starting with the text come first
     rows = query_all(f"""
-        SELECT p.name, COALESCE(s.name, c.name) AS type
+        SELECT p.place_id, p.name, COALESCE(s.name, c.name) AS type
         FROM places p
         JOIN categories c ON c.category_id = p.category_id
         LEFT JOIN sub_types s ON s.sub_type_id = p.sub_type_id
@@ -103,6 +103,53 @@ def suggest():
         LIMIT 6
     """, [f"%{q}%"] * 5 + [f"{q}%"])
     return jsonify(rows)
+
+
+@app.route("/places/<int:place_id>")
+def place_details(place_id):
+    place = query_one("""
+        SELECT p.*, c.name AS category, s.name AS sub_type,
+               ROUND(AVG(r.rating), 1) AS rating, COUNT(r.review_id) AS review_count
+        FROM places p
+        JOIN categories c ON c.category_id = p.category_id
+        LEFT JOIN sub_types s ON s.sub_type_id = p.sub_type_id
+        LEFT JOIN reviews r ON r.place_id = p.place_id
+        WHERE p.place_id = %s
+        GROUP BY p.place_id
+    """, (place_id,))
+    if place is None:
+        abort(404)
+
+    reviews = query_all("""
+        SELECT r.rating, r.comment, r.created_at, u.full_name
+        FROM reviews r
+        JOIN users u ON u.user_id = r.user_id
+        WHERE r.place_id = %s
+        ORDER BY r.created_at DESC
+    """, (place_id,))
+
+    # other places closest to this one (distance in km)
+    nearby = []
+    if place["latitude"] is not None:
+        nearby = query_all("""
+            SELECT p.place_id, p.name, p.image_file, c.name AS category,
+                   COALESCE(s.name, c.name) AS type,
+                   ROUND(ST_Distance_Sphere(POINT(p.longitude, p.latitude), POINT(%s, %s)) / 1000, 1) AS km
+            FROM places p
+            JOIN categories c ON c.category_id = p.category_id
+            LEFT JOIN sub_types s ON s.sub_type_id = p.sub_type_id
+            WHERE p.place_id != %s AND p.latitude IS NOT NULL
+            ORDER BY km
+            LIMIT 3
+        """, (place["longitude"], place["latitude"], place_id))
+
+    return render_template("place_details.html", place=place, reviews=reviews, nearby=nearby)
+
+
+@app.errorhandler(404)
+def not_found(error):
+    return render_template("404.html"), 404
+
 
 if __name__ == "__main__":
     app.run(debug=True)

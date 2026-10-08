@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+
+{% block title %}{{ place.name }} - KandyTrail{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('places') }}" class="back-link" id="backLink">
+    <svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
+    Back to places
+</a>
+
+<div class="details">
+    <div class="details-main">
+        <div class="details-photo">
+            {% if place.image_file %}
+                <img src="{{ url_for('static', filename='images/places/' ~ place.image_file) }}" alt="{{ place.name }}">
+            {% else %}
+                <img class="photo-icon" src="{{ url_for('static', filename='images/categories/' ~ place.category|lower ~ '.png') }}" alt="" onerror="this.remove()">
+            {% endif %}
+            <span class="rating">
+                {% if place.rating %}&#9733; {{ place.rating }} ({{ place.review_count }}){% else %}New{% endif %}
+            </span>
+        </div>
+
+        <div class="details-title">
+            <span class="tag">{{ place.category }}</span>
+            <h1>{{ place.name }}</h1>
+            <p class="place-tag">{{ place.sub_type or place.category }} &middot; {{ place.distance_km|round|int }} km from Kandy</p>
+        </div>
+
+        <section class="details-block about">
+            <h2>About</h2>
+            <p>{{ place.description or place.short_description }}</p>
+        </section>
+
+        {% if place.travel_tips %}
+            <section class="details-block tips">
+                <h2>Travel tips</h2>
+                <p>{{ place.travel_tips }}</p>
+            </section>
+        {% endif %}
+
+        <section class="details-block reviews">
+            <h2>Reviews</h2>
+            {% if reviews %}
+                {% for review in reviews %}
+                    <div class="review">
+                        <div class="review-head">
+                            <strong>{{ review.full_name }}</strong>
+                            <span class="stars">{{ "&#9733;"|safe * review.rating }}</span>
+                        </div>
+                        {% if review.comment %}<p>{{ review.comment }}</p>{% endif %}
+                        <span class="review-date">{{ review.created_at.strftime('%d %b %Y') }}</span>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p class="muted">No reviews yet. Sign in to be the first to review this place.</p>
+            {% endif %}
+        </section>
+    </div>
+
+    <aside class="details-side">
+        <div class="info-card">
+            <div class="info-row">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                <div>
+                    <span class="info-label">Opening hours</span>
+                    <span>{{ place.opening_hours or "Not available" }}</span>
+                </div>
+            </div>
+            {% if place.visit_duration_min %}
+                <div class="info-row">
+                    <svg viewBox="0 0 24 24"><path d="M6 3h12M6 21h12M7 3c0 5 10 5 10 9s-10 4-10 9M17 3c0 5-10 5-10 9s10 4 10 9"/></svg>
+                    <div>
+                        <span class="info-label">Time needed</span>
+                        <span>
+                            {% set hours = place.visit_duration_min // 60 %}
+                            {% set mins = place.visit_duration_min % 60 %}
+                            About {% if hours %}{{ hours }} h{% endif %} {% if mins %}{{ mins }} min{% endif %}
+                        </span>
+                    </div>
+                </div>
+            {% endif %}
+            <div class="info-row">
+                <svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg>
+                <div>
+                    <span class="info-label">Entry fee</span>
+                    <span>{{ place.entry_fee or "Not available" }}</span>
+                </div>
+            </div>
+            {% if place.contact %}
+                <div class="info-row">
+                    <svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-3 2a11 11 0 0 0 5 5l2-3 5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg>
+                    <div>
+                        <span class="info-label">Contact</span>
+                        <span>{{ place.contact }}</span>
+                    </div>
+                </div>
+            {% endif %}
+
+            <div class="details-actions">
+                <button type="button" class="btn btn-primary trip-btn" data-place="{{ place.place_id }}">
+                    <span class="when-off">Add to my trip</span>
+                    <span class="when-on">Added to my trip</span>
+                </button>
+                <button type="button" class="btn btn-light save-toggle" data-place="{{ place.place_id }}">
+                    <svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z"/></svg>
+                    <span class="when-off">Save</span>
+                    <span class="when-on">Saved</span>
+                </button>
+            </div>
+            <p class="info-note">Opening hours and fees may change. Please check before visiting.</p>
+        </div>
+
+        {% if place.latitude is not none %}
+            <div class="map-card">
+                <div id="map" data-lat="{{ place.latitude }}" data-lng="{{ place.longitude }}" data-name="{{ place.name }}"></div>
+                <a href="https://www.google.com/maps/dir/?api=1&destination={{ place.latitude }},{{ place.longitude }}" target="_blank" rel="noopener" class="map-link">
+                    Get directions
+                    <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                </a>
+            </div>
+        {% endif %}
+    </aside>
+</div>
+
+{% if nearby %}
+    <section class="section">
+        <div class="section-head">
+            <h2>Nearby places</h2>
+            <p>Close enough to visit on the same day</p>
+        </div>
+        <div class="nearby-list">
+            {% for item in nearby %}
+                <a href="{{ url_for('place_details', place_id=item.place_id) }}" class="nearby-item">
+                    <span class="nearby-photo">
+                        {% if item.image_file %}
+                            <img src="{{ url_for('static', filename='images/places/' ~ item.image_file) }}" alt="">
+                        {% else %}
+                            <img class="photo-icon" src="{{ url_for('static', filename='images/categories/' ~ item.category|lower ~ '.png') }}" alt="" onerror="this.remove()">
+                        {% endif %}
+                    </span>
+                    <span class="nearby-text">
+                        <strong>{{ item.name }}</strong>
+                        <span>{{ item.type }} &middot; {{ item.km }} km away</span>
+                    </span>
+                </a>
+            {% endfor %}
+        </div>
+    </section>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="{{ url_for('static', filename='js/details.js') }}"></script>
+{% endblock %}

@@ -11,7 +11,7 @@ updateHeader();
 // saved places are kept in the browser until user accounts are added
 const saved = new Set(JSON.parse(localStorage.getItem("savedPlaces") || "[]"));
 
-document.querySelectorAll(".save-btn").forEach(button => {
+document.querySelectorAll(".save-btn, .save-toggle").forEach(button => {
     if (saved.has(button.dataset.place)) button.classList.add("saved");
 
     button.addEventListener("click", () => {

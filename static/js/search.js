@@ -14,8 +14,8 @@ document.querySelectorAll(".search-box input[name='q']").forEach(input => {
         current = -1;
     }
 
-    function choose(name) {
-        window.location = `/places?q=${encodeURIComponent(name)}`;
+    function choose(id) {
+        window.location = `/places/${id}`;
     }
 
     function highlight(index) {
@@ -41,7 +41,8 @@ document.querySelectorAll(".search-box input[name='q']").forEach(input => {
             name.textContent = place.name;
             type.textContent = place.type;
             li.append(name, type);
-            li.addEventListener("mousedown", () => choose(place.name));
+            li.dataset.id = place.place_id;
+            li.addEventListener("mousedown", () => choose(place.place_id));
             list.appendChild(li);
         });
         current = -1;
@@ -65,7 +66,7 @@ document.querySelectorAll(".search-box input[name='q']").forEach(input => {
             highlight(current <= 0 ? items.length - 1 : current - 1);
         } else if (event.key === "Enter" && current >= 0) {
             event.preventDefault();
-            choose(items[current].querySelector("strong").textContent);
+            choose(items[current].dataset.id);
         } else if (event.key === "Escape") {
             close();
         }

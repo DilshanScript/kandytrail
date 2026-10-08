@@ -25,3 +25,8 @@ def query_all(sql, params=None):
             return cur.fetchall()
     finally:
         conn.close()
+
+
+def query_one(sql, params=None):
+    rows = query_all(sql, params)
+    return rows[0] if rows else None
