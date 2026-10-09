@@ -1,0 +1,169 @@
+{% extends "admin/layout.html" %}
+
+{% block title %}{{ "Edit place" if editing else "Add place" }}{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('admin.dashboard') }}" class="back-link">
+    <svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
+    Back to dashboard
+</a>
+
+<div class="admin-head">
+    <div>
+        <h1>{{ "Edit place" if editing else "Add a new place" }}</h1>
+        <p>Fields marked * are required.</p>
+    </div>
+</div>
+
+<form class="place-form" id="placeForm" method="post" enctype="multipart/form-data">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+    <section class="form-card">
+        <h2>Basic details</h2>
+        <label class="field">
+            <span>Name *</span>
+            <input type="text" name="name" value="{{ place.name or '' }}" maxlength="150" required>
+        </label>
+
+        <div class="field">
+            <span>Categories * <small>pick one or more, the first one is shown on place cards</small></span>
+            <input type="hidden" name="main_category_id" id="mainCategory" value="{{ place.category_id or '' }}">
+            <div class="pick-group" id="categoryPicks">
+                {% for category in categories %}
+                    <label class="option">
+                        <input type="checkbox" name="category_ids" value="{{ category.category_id }}" {% if category.category_id in (place.category_ids or []) %}checked{% endif %}>
+                        <span>
+                            <img src="{{ url_for('static', filename='images/categories/' ~ category.name|lower ~ '.png') }}" alt="" onerror="this.remove()">
+                            {{ category.name }}
+                            <em class="main-badge">Main</em>
+                        </span>
+                    </label>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="field" id="typeField">
+            <span>Types <small>optional</small></span>
+            <div class="pick-group" id="typePicks">
+                {% for sub in sub_types %}
+                    <label class="option" data-category="{{ sub.category_id }}">
+                        <input type="checkbox" name="sub_type_ids" value="{{ sub.sub_type_id }}" {% if sub.sub_type_id in (place.sub_type_ids or []) %}checked{% endif %}>
+                        <span>{{ sub.name }}</span>
+                    </label>
+                {% endfor %}
+            </div>
+            <p class="form-hint" id="typeHint">Pick a category first to see its types.</p>
+        </div>
+
+        <label class="field">
+            <span>Short description * <small class="counter" data-for="short_description"></small></span>
+            <textarea name="short_description" rows="2" maxlength="300" required>{{ place.short_description or '' }}</textarea>
+        </label>
+        <label class="field">
+            <span>Full description</span>
+            <textarea name="description" rows="5">{{ place.description or '' }}</textarea>
+        </label>
+        <label class="field">
+            <span>Keywords <small>separate with commas, used by search</small></span>
+            <input type="text" name="keywords" value="{{ place.keywords or '' }}" maxlength="300" placeholder="e.g. waterfall, hiking, swimming, photos">
+        </label>
+        <div class="quick-picks" data-target="keywords" data-mode="list" id="keywordPicks" data-saved="{{ keywords|join(',') }}"></div>
+    </section>
+
+    <section class="form-card">
+        <h2>Visit information</h2>
+        <div class="field-row">
+            <label class="field">
+                <span>Opening hours</span>
+                <input type="text" name="opening_hours" value="{{ place.opening_hours or '' }}" maxlength="200" placeholder="e.g. Daily 8:00am - 5:00pm">
+                <span class="quick-picks" data-target="opening_hours">
+                    <button type="button" data-value="Open all day">Open all day</button>
+                    <button type="button" data-value="Daily 6:00am - 6:00pm">6am - 6pm</button>
+                    <button type="button" data-value="Daily 8:00am - 5:00pm">8am - 5pm</button>
+                    <button type="button" data-value="Daily 9:00am - 5:00pm">9am - 5pm</button>
+                    <button type="button" data-value="Daily 7:00am - 9:00pm">7am - 9pm</button>
+                </span>
+            </label>
+            <label class="field">
+                <span>Time needed (minutes)</span>
+                <input type="number" name="visit_duration_min" value="{{ place.visit_duration_min or '' }}" min="5" max="720" step="5" placeholder="e.g. 60">
+                <span class="quick-picks" data-target="visit_duration_min">
+                    <button type="button" data-value="30">30 min</button>
+                    <button type="button" data-value="60">1 h</button>
+                    <button type="button" data-value="90">1.5 h</button>
+                    <button type="button" data-value="120">2 h</button>
+                    <button type="button" data-value="180">3 h</button>
+                    <button type="button" data-value="240">Half day</button>
+                </span>
+            </label>
+        </div>
+        <div class="field-row">
+            <label class="field">
+                <span>Entry fee</span>
+                <input type="text" name="entry_fee" value="{{ place.entry_fee or '' }}" maxlength="150" placeholder="e.g. Free for locals, Rs. 2000 for foreigners">
+                <span class="quick-picks" data-target="entry_fee">
+                    <button type="button" data-value="Free">Free</button>
+                    <button type="button" data-value="Free for locals, ticket for foreign visitors">Free for locals</button>
+                    <button type="button" data-value="Small ticket">Small ticket</button>
+                    <button type="button" data-value="Lower price for locals and children">Lower for locals / kids</button>
+                    <button type="button" data-value="Pay for what you eat">Pay for food</button>
+                </span>
+            </label>
+            <label class="field">
+                <span>Contact</span>
+                <input type="text" name="contact" value="{{ place.contact or '' }}" maxlength="150" placeholder="Phone or website">
+            </label>
+        </div>
+        <label class="field">
+            <span>Travel tips</span>
+            <textarea name="travel_tips" rows="3">{{ place.travel_tips or '' }}</textarea>
+        </label>
+    </section>
+
+    <section class="form-card">
+        <h2>Location *</h2>
+        <p class="form-hint">Click the map to drop the pin, or drag it. The circle shows the 25 km limit around Kandy.</p>
+        <div id="pickMap"></div>
+        <div class="field-row coords">
+            <label class="field">
+                <span>Latitude</span>
+                <input type="number" name="latitude" id="latInput" value="{{ place.latitude if place.latitude is not none else '' }}" step="any">
+            </label>
+            <label class="field">
+                <span>Longitude</span>
+                <input type="number" name="longitude" id="lngInput" value="{{ place.longitude if place.longitude is not none else '' }}" step="any">
+            </label>
+            <div class="field">
+                <span>From Kandy</span>
+                <strong class="distance-out" id="distanceOut">--</strong>
+            </div>
+        </div>
+    </section>
+
+    <section class="form-card">
+        <h2>Photo</h2>
+        <label class="photo-drop">
+            <input type="file" name="photo" id="photoInput" accept=".jpg,.jpeg,.png,.webp">
+            <span class="photo-preview" id="photoPreview">
+                {% if place.image_file %}
+                    <img src="{{ url_for('static', filename='images/places/' ~ place.image_file) }}" alt="">
+                {% endif %}
+            </span>
+            <span class="photo-text">
+                <strong>{{ "Change photo" if place.image_file else "Choose a photo" }}</strong>
+                <small>JPG, PNG or WEBP, up to 5 MB</small>
+            </span>
+        </label>
+    </section>
+
+    <div class="form-actions">
+        <a href="{{ url_for('admin.dashboard') }}" class="btn btn-light">Cancel</a>
+        <button type="submit" class="btn btn-primary">{{ "Save changes" if editing else "Add place" }}</button>
+    </div>
+</form>
+{% endblock %}

@@ -1,0 +1,91 @@
+{% extends "admin/layout.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="admin-head">
+    <div>
+        <h1>Hello, {{ session.admin_name }}</h1>
+        <p>Manage the places travellers can see.</p>
+    </div>
+    <a href="{{ url_for('admin.new_place') }}" class="btn btn-primary">
+        Add place
+        <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+    </a>
+</div>
+
+<div class="stat-row">
+    <div class="stat-card">
+        <span class="stat-number">{{ stats.places }}</span>
+        <span>Places</span>
+    </div>
+    <div class="stat-card">
+        <span class="stat-number">{{ stats.reviews }}</span>
+        <span>Reviews</span>
+    </div>
+    <div class="stat-card">
+        <span class="stat-number">{{ stats.users }}</span>
+        <span>Travellers</span>
+    </div>
+</div>
+
+<div class="admin-list-head">
+    <h2>Places</h2>
+    <div class="admin-search-wrap">
+        <div class="search-box admin-search">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+            <input type="text" id="placeSearch" placeholder="Search places">
+            <button type="button" class="admin-filter-btn" id="adminFilterBtn" aria-label="Filter by category" aria-expanded="false">
+                <svg viewBox="0 0 24 24"><circle cx="7" cy="7" r="2.5"/><path d="M12 7h8"/><circle cx="17" cy="17" r="2.5"/><path d="M4 17h8"/></svg>
+                <span class="filter-count" id="filterCount" hidden></span>
+            </button>
+        </div>
+        <div class="admin-filter-menu" id="adminFilterMenu" hidden>
+            <div class="panel-head">
+                <strong>Filter by category</strong>
+                <button type="button" class="clear-link" id="clearFilter">Clear</button>
+            </div>
+            <div class="pick-group">
+                {% for category in categories %}
+                    <label class="option">
+                        <input type="checkbox" value="{{ category.category_id }}" class="filter-check">
+                        <span>
+                            <img src="{{ url_for('static', filename='images/categories/' ~ category.name|lower ~ '.png') }}" alt="" onerror="this.remove()">
+                            {{ category.name }}
+                        </span>
+                    </label>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if places %}
+    <div class="admin-list" id="placeList">
+        {% for place in places %}
+            <div class="admin-row" data-categories="{{ place.category_ids }}" data-search="{{ (place.name ~ ' ' ~ place.categories ~ ' ' ~ (place.sub_type or ''))|lower }}">
+                <span class="admin-thumb">
+                    {% if place.image_file %}
+                        <img src="{{ url_for('static', filename='images/places/' ~ place.image_file) }}" alt="">
+                    {% endif %}
+                </span>
+                <div class="admin-row-text">
+                    <a href="{{ url_for('place_details', place_id=place.place_id) }}" target="_blank"><strong>{{ place.name }}</strong></a>
+                    <span>{{ place.categories }}{% if place.sub_type %} &middot; {{ place.sub_type }}{% endif %} &middot; {{ place.distance_km }} km</span>
+                </div>
+                <span class="admin-date">Updated {{ place.updated_at.strftime('%d %b %Y') }}</span>
+                <div class="admin-actions">
+                    <a href="{{ url_for('admin.edit_place', place_id=place.place_id) }}" class="btn btn-light btn-small">Edit</a>
+                    <form action="{{ url_for('admin.delete_place', place_id=place.place_id) }}" method="post" class="delete-form" data-name="{{ place.name }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <button type="submit" class="btn btn-danger btn-small">Delete</button>
+                    </form>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+    <p class="empty" id="noMatch" hidden>No places match your search.</p>
+{% else %}
+    <p class="empty">No places yet. Click "Add place" to add the first one.</p>
+{% endif %}
+{% endblock %}

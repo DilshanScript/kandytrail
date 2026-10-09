@@ -1,0 +1,24 @@
+{% extends "admin/layout.html" %}
+
+{% block title %}Admin login{% endblock %}
+
+{% block content %}
+<form class="login-card" method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <h1>Admin login</h1>
+    <p>Sign in to manage places.</p>
+
+    {% if error %}<p class="form-error">{{ error }}</p>{% endif %}
+
+    <label class="field">
+        <span>Username</span>
+        <input type="text" name="username" value="{{ request.form.username }}" required autofocus autocomplete="username">
+    </label>
+    <label class="field">
+        <span>Password</span>
+        <input type="password" name="password" required autocomplete="current-password">
+    </label>
+    <button type="submit" class="btn btn-primary">Sign in</button>
+    <a href="{{ url_for('home') }}" class="login-back">Back to website</a>
+</form>
+{% endblock %}

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Admin{% endblock %} - KandyTrail</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    {% block head %}{% endblock %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="admin-page">
+    <header class="site-header">
+        <div class="topbar">
+            <a href="{{ url_for('admin.dashboard') }}" class="logo">
+                <span class="logo-icon">
+                    <svg viewBox="0 0 24 24"><path d="M21 3 3 10.5l7.5 3L13.5 21z"/></svg>
+                </span>
+                <span class="logo-text">KandyTrail</span>
+                <span class="admin-badge">Admin</span>
+            </a>
+
+            {% if session.admin_id %}
+                <div class="admin-nav">
+                    <a href="{{ url_for('home') }}" class="admin-link" target="_blank">View site</a>
+                    <form action="{{ url_for('admin.logout') }}" method="post">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <button type="submit" class="btn btn-light btn-small">Log out</button>
+                    </form>
+                </div>
+            {% endif %}
+        </div>
+    </header>
+
+    <main class="container admin-main">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-list">
+                    {% for category, message in messages %}
+                        <p class="flash {{ category }}">{{ message }}</p>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <div class="modal" id="confirmModal" hidden>
+        <div class="modal-backdrop" data-answer="no"></div>
+        <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+            <span class="modal-icon" id="modalIcon">
+                <svg viewBox="0 0 24 24"><path d="M12 8v5M12 16.5v.5"/><circle cx="12" cy="12" r="9"/></svg>
+            </span>
+            <h3 id="modalTitle"></h3>
+            <p id="modalText"></p>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-light" data-answer="no" id="modalNo">Cancel</button>
+                <button type="button" class="btn btn-primary" data-answer="yes" id="modalYes">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
