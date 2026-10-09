@@ -1,10 +1,24 @@
+import os
 from datetime import date
 
 from flask import Flask, abort, jsonify, render_template, request
 
+from admin import admin
 from db import query_all, query_one
 
 app = Flask(__name__)
+app.secret_key = os.getenv("SECRET_KEY", "dev-only-change-me")
+app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024
+app.register_blueprint(admin)
+
+
+# columns needed for a place card, including all its category and type ids
+CARD_COLUMNS = """p.place_id, p.name, p.short_description, p.distance_km, p.image_file,
+    c.name AS category, s.name AS sub_type, ROUND(AVG(r.rating), 1) AS rating,
+    (SELECT GROUP_CONCAT(category_id SEPARATOR ' ') FROM place_categories
+     WHERE place_id = p.place_id) AS category_ids,
+    (SELECT GROUP_CONCAT(sub_type_id SEPARATOR ' ') FROM place_sub_types
+     WHERE place_id = p.place_id) AS sub_type_ids"""
 
 
 @app.context_processor
@@ -17,10 +31,8 @@ def home():
     categories = query_all("SELECT category_id, name FROM categories ORDER BY category_id")
 
     # places with category, sub-type and average rating, best rated first
-    places = query_all("""
-        SELECT p.place_id, p.name, p.short_description, p.distance_km, p.image_file,
-               p.category_id, p.sub_type_id, c.name AS category, s.name AS sub_type,
-               ROUND(AVG(r.rating), 1) AS rating
+    places = query_all(f"""
+        SELECT {CARD_COLUMNS}
         FROM places p
         JOIN categories c ON c.category_id = p.category_id
         LEFT JOIN sub_types s ON s.sub_type_id = p.sub_type_id
@@ -33,9 +45,12 @@ def home():
     return render_template("index.html", categories=categories, sub_types=sub_types, places=places)
 
 
-# search text matches the name, description, keywords, sub-type or category
+# search text matches the name, description, keywords, or any of its types or categories
 SEARCH_SQL = """(p.name LIKE %s OR p.short_description LIKE %s OR p.keywords LIKE %s
-    OR s.name LIKE %s OR c.name LIKE %s)"""
+    OR EXISTS (SELECT 1 FROM place_sub_types ps JOIN sub_types st ON st.sub_type_id = ps.sub_type_id
+               WHERE ps.place_id = p.place_id AND st.name LIKE %s)
+    OR EXISTS (SELECT 1 FROM place_categories pc JOIN categories ct ON ct.category_id = pc.category_id
+               WHERE pc.place_id = p.place_id AND ct.name LIKE %s))"""
 
 
 @app.route("/places")
@@ -61,17 +76,15 @@ def places():
         conditions.append(SEARCH_SQL)
         params += [f"%{q}%"] * 5
     if category_id:
-        conditions.append("p.category_id = %s")
+        conditions.append("EXISTS (SELECT 1 FROM place_categories WHERE place_id = p.place_id AND category_id = %s)")
         params.append(category_id)
     if sub_type_id:
-        conditions.append("p.sub_type_id = %s")
+        conditions.append("EXISTS (SELECT 1 FROM place_sub_types WHERE place_id = p.place_id AND sub_type_id = %s)")
         params.append(sub_type_id)
     where = "WHERE " + " AND ".join(conditions) if conditions else ""
 
     results = query_all(f"""
-        SELECT p.place_id, p.name, p.short_description, p.distance_km, p.image_file,
-               p.category_id, p.sub_type_id, c.name AS category, s.name AS sub_type,
-               ROUND(AVG(r.rating), 1) AS rating
+        SELECT {CARD_COLUMNS}
         FROM places p
         JOIN categories c ON c.category_id = p.category_id
         LEFT JOIN sub_types s ON s.sub_type_id = p.sub_type_id
@@ -120,6 +133,17 @@ def place_details(place_id):
     if place is None:
         abort(404)
 
+    place["categories"] = query_all("""
+        SELECT c.name FROM place_categories pc
+        JOIN categories c ON c.category_id = pc.category_id
+        WHERE pc.place_id = %s ORDER BY c.category_id = %s DESC, c.category_id
+    """, (place_id, place["category_id"]))
+    place["sub_types"] = query_all("""
+        SELECT s.name FROM place_sub_types ps
+        JOIN sub_types s ON s.sub_type_id = ps.sub_type_id
+        WHERE ps.place_id = %s ORDER BY s.sub_type_id = %s DESC, s.sub_type_id
+    """, (place_id, place["sub_type_id"]))
+
     reviews = query_all("""
         SELECT r.rating, r.comment, r.created_at, u.full_name
         FROM reviews r
@@ -149,6 +173,11 @@ def place_details(place_id):
 @app.errorhandler(404)
 def not_found(error):
     return render_template("404.html"), 404
+
+
+@app.errorhandler(413)
+def too_large(error):
+    return "Photo is too large. Please use an image under 5 MB.", 413
 
 
 if __name__ == "__main__":

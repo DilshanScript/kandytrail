@@ -1,4 +1,4 @@
-<div class="place-card" data-category="{{ place.category_id }}" data-sub-type="{{ place.sub_type_id or '' }}">
+<div class="place-card" data-categories="{{ place.category_ids or '' }}" data-sub-types="{{ place.sub_type_ids or '' }}">
     <div class="place-photo">
         {% if place.image_file %}
             <img src="{{ url_for('static', filename='images/places/' ~ place.image_file) }}" alt="{{ place.name }}">

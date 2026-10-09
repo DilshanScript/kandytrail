@@ -44,6 +44,24 @@ CREATE TABLE places (
     FOREIGN KEY (sub_type_id) REFERENCES sub_types(sub_type_id)
 );
 
+-- place_categories (a place can have more than one category)
+CREATE TABLE place_categories (
+    place_id    INT NOT NULL,
+    category_id INT NOT NULL,
+    PRIMARY KEY (place_id, category_id),
+    FOREIGN KEY (place_id)    REFERENCES places(place_id) ON DELETE CASCADE,
+    FOREIGN KEY (category_id) REFERENCES categories(category_id)
+);
+
+-- place_sub_types
+CREATE TABLE place_sub_types (
+    place_id    INT NOT NULL,
+    sub_type_id INT NOT NULL,
+    PRIMARY KEY (place_id, sub_type_id),
+    FOREIGN KEY (place_id)    REFERENCES places(place_id) ON DELETE CASCADE,
+    FOREIGN KEY (sub_type_id) REFERENCES sub_types(sub_type_id)
+);
+
 -- admins
 CREATE TABLE admins (
     admin_id      INT AUTO_INCREMENT PRIMARY KEY,
@@ -137,3 +155,9 @@ VALUES
  7.281000, 80.592000, 11, 'Daily 7:00am - 7:00pm', 45, 'Budget',
  'Pay for what you eat', 'Try the hoppers and herbal porridge. Busy around lunchtime.',
  'lunch, sri lankan food, rice and curry, hoppers, cheap, vegetarian');
+
+INSERT INTO place_categories (place_id, category_id)
+SELECT place_id, category_id FROM places;
+
+INSERT INTO place_sub_types (place_id, sub_type_id)
+SELECT place_id, sub_type_id FROM places WHERE sub_type_id IS NOT NULL;

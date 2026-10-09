@@ -54,7 +54,7 @@ categoryButtons.forEach(button => {
 
         const selected = isActive ? null : button.dataset.category;
         row.querySelectorAll(".place-card").forEach(card => {
-            card.hidden = selected !== null && card.dataset.category !== selected;
+            card.hidden = selected !== null && !card.dataset.categories.split(" ").includes(selected);
         });
 
         // open the places page with the same category
@@ -94,8 +94,8 @@ function updatePanel() {
 
     const type = typeInput && !typeInput.closest(".option").hidden ? typeInput.value : "";
     const count = [...allCards].filter(card =>
-        (!category || card.dataset.category === category) &&
-        (!type || card.dataset.subType === type)
+        (!category || card.dataset.categories.split(" ").includes(category)) &&
+        (!type || card.dataset.subTypes.split(" ").includes(type))
     ).length;
     panelSubmit.textContent = `Show ${count} place${count === 1 ? "" : "s"}`;
 }

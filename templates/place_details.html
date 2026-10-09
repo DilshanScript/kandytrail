@@ -26,9 +26,11 @@
         </div>
 
         <div class="details-title">
-            <span class="tag">{{ place.category }}</span>
+            <div class="tag-row">
+                {% for category in place.categories %}<span class="tag">{{ category.name }}</span>{% endfor %}
+            </div>
             <h1>{{ place.name }}</h1>
-            <p class="place-tag">{{ place.sub_type or place.category }} &middot; {{ place.distance_km|round|int }} km from Kandy</p>
+            <p class="place-tag">{% if place.sub_types %}{{ place.sub_types|map(attribute="name")|join(", ") }}{% else %}{{ place.category }}{% endif %} &middot; {{ place.distance_km|round|int }} km from Kandy</p>
         </div>
 
         <section class="details-block about">

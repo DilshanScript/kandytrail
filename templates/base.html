@@ -48,7 +48,7 @@
         <div class="footer-links">
             <a href="#">About</a>
             <a href="#">Contact</a>
-            <a href="#">Admin login</a>
+            <a href="{{ url_for('admin.login') }}">Admin login</a>
         </div>
         <p class="footer-note">Opening hours and fees may change. Please check before visiting.</p>
         <p class="footer-copy">&copy; {{ today.year }} KandyTrail</p>

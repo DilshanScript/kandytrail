@@ -30,3 +30,14 @@ def query_all(sql, params=None):
 def query_one(sql, params=None):
     rows = query_all(sql, params)
     return rows[0] if rows else None
+
+
+def execute(sql, params=None):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql, params)
+            conn.commit()
+            return cur.lastrowid
+    finally:
+        conn.close()
