@@ -1,6 +1,7 @@
 import math
 import os
 import secrets
+from datetime import datetime
 from functools import wraps
 
 from flask import (Blueprint, abort, current_app, flash, redirect, render_template,
@@ -15,8 +16,9 @@ admin = Blueprint("admin", __name__, url_prefix="/admin")
 # Kandy city centre, used for distance_km
 KANDY_LAT, KANDY_LNG = 7.2906, 80.6337
 IMAGE_TYPES = {"jpg", "jpeg", "png", "webp"}
-TEXT_FIELDS = ["name", "short_description", "description", "keywords", "opening_hours",
+TEXT_FIELDS = ["name", "short_description", "description", "keywords",
                "entry_fee", "travel_tips", "contact"]
+DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
 
 def login_required(view):
@@ -54,6 +56,62 @@ def distance_from_kandy(lat, lng):
     return round(2 * r * math.asin(math.sqrt(a)), 1)
 
 
+def time_text(value):
+    # MySQL TIME comes back as a timedelta, the form needs "HH:MM"
+    if value is None or isinstance(value, str):
+        return value
+    minutes = int(value.total_seconds()) // 60
+    return f"{minutes // 60:02d}:{minutes % 60:02d}"
+
+
+def valid_time(text):
+    try:
+        datetime.strptime(text, "%H:%M")
+        return True
+    except ValueError:
+        return False
+
+
+def nice_time(text):
+    # "17:30" -> "5:30pm"
+    hour, minute = map(int, text.split(":"))
+    return f"{hour % 12 or 12}:{minute:02d}{'am' if hour < 12 else 'pm'}"
+
+
+def hours_text(open_time, close_time, closed_days):
+    """Opening hours line shown to visitors, built from the times."""
+    if open_time:
+        text = f"{nice_time(open_time)} - {nice_time(close_time)}"
+    else:
+        text = "Open all day"
+    if closed_days:
+        return f"{text}, closed on {closed_days.replace(',', ', ')}"
+    return text if not open_time else f"Daily {text}"
+
+
+def read_visit_options(form, errors):
+    """Ways to visit from the form, the ticked one is the default."""
+    default = form.get("default_option", type=int, default=0)
+    options, bad_row = [], False
+    for i, (label, mins) in enumerate(zip(form.getlist("option_label"), form.getlist("option_minutes"))):
+        label, mins = label.strip(), mins.strip()
+        if not label and not mins:
+            continue
+        if not label or not mins.isdigit() or not 5 <= int(mins) <= 720:
+            bad_row = True  # kept so the form shows it again
+        else:
+            mins = int(mins)
+        options.append({"label": label[:80], "duration_min": mins, "is_default": i == default})
+
+    if bad_row:
+        errors.append("Each way to visit needs a name and 5 to 720 minutes.")
+    elif not options:
+        errors.append("Add at least one way to visit.")
+    if options and not any(o["is_default"] for o in options):
+        options[0]["is_default"] = True
+    return options
+
+
 def read_place_form():
     """Return (data, errors) from the submitted place form."""
     form = request.form
@@ -80,9 +138,25 @@ def read_place_form():
     main_types = [t for t in data["sub_type_ids"] if allowed[t] == data["category_id"]]
     data["sub_type_id"] = (main_types or data["sub_type_ids"] or [None])[0]
 
-    data["visit_duration_min"] = form.get("visit_duration_min", type=int)
-    if data["visit_duration_min"] is not None and not 5 <= data["visit_duration_min"] <= 720:
-        errors.append("Time needed must be between 5 and 720 minutes.")
+    # default way to visit also fills visit_duration_min for the place pages
+    data["options"] = read_visit_options(form, errors)
+    data["visit_duration_min"] = next((o["duration_min"] for o in data["options"] if o["is_default"]), None)
+
+    # opening times for the trip planner, empty means open all day
+    data["open_time"] = form.get("open_time", "").strip() or None
+    data["close_time"] = form.get("close_time", "").strip() or None
+    if form.get("open_all_day"):
+        data["open_time"] = data["close_time"] = None
+    elif not (data["open_time"] and data["close_time"]):
+        errors.append("Give both opening and closing time, or tick Open all day.")
+    elif not (valid_time(data["open_time"]) and valid_time(data["close_time"])):
+        errors.append("Opening times must look like 08:30.")
+    elif data["close_time"] <= data["open_time"]:
+        errors.append("Closing time must be after opening time.")
+    data["closed_days"] = ",".join(d for d in DAYS if d in form.getlist("closed_days")) or None
+    # the line visitors see is made from the times
+    if not errors:
+        data["opening_hours"] = hours_text(data["open_time"], data["close_time"], data["closed_days"])
 
     data["latitude"] = form.get("latitude", type=float)
     data["longitude"] = form.get("longitude", type=float)
@@ -132,6 +206,14 @@ def save_links(place_id, data):
     for sub_type_id in data["sub_type_ids"]:
         execute("INSERT INTO place_sub_types (place_id, sub_type_id) VALUES (%s, %s)",
                 (place_id, sub_type_id))
+
+
+def save_visit_options(place_id, options):
+    execute("DELETE FROM visit_options WHERE place_id = %s", (place_id,))
+    for option in options:
+        execute("""INSERT INTO visit_options (place_id, label, duration_min, is_default)
+                   VALUES (%s, %s, %s, %s)""",
+                (place_id, option["label"], option["duration_min"], option["is_default"]))
 
 
 def keyword_suggestions():
@@ -216,16 +298,18 @@ def new_place():
     if request.method == "POST":
         place, errors = read_place_form()
         if not errors:
+            options = place.pop("options")
             place_id = execute("""
                 INSERT INTO places (name, category_id, sub_type_id, short_description, description,
-                    keywords, latitude, longitude, distance_km, opening_hours, visit_duration_min,
-                    entry_fee, travel_tips, contact)
+                    keywords, latitude, longitude, distance_km, opening_hours, open_time, close_time,
+                    closed_days, visit_duration_min, entry_fee, travel_tips, contact)
                 VALUES (%(name)s, %(category_id)s, %(sub_type_id)s, %(short_description)s,
                     %(description)s, %(keywords)s, %(latitude)s, %(longitude)s, %(distance_km)s,
-                    %(opening_hours)s, %(visit_duration_min)s, %(entry_fee)s, %(travel_tips)s,
-                    %(contact)s)
+                    %(opening_hours)s, %(open_time)s, %(close_time)s, %(closed_days)s,
+                    %(visit_duration_min)s, %(entry_fee)s, %(travel_tips)s, %(contact)s)
             """, place)
             save_links(place_id, place)
+            save_visit_options(place_id, options)
             image = save_photo(place_id)
             if image:
                 execute("UPDATE places SET image_file = %s WHERE place_id = %s", (image, place_id))
@@ -250,12 +334,17 @@ def edit_place(place_id):
         "SELECT category_id FROM place_categories WHERE place_id = %s", (place_id,))]
     place["sub_type_ids"] = [r["sub_type_id"] for r in query_all(
         "SELECT sub_type_id FROM place_sub_types WHERE place_id = %s", (place_id,))]
+    place["options"] = query_all("""SELECT label, duration_min, is_default FROM visit_options
+                                    WHERE place_id = %s ORDER BY option_id""", (place_id,))
+    place["open_time"] = time_text(place["open_time"])
+    place["close_time"] = time_text(place["close_time"])
 
     if request.method == "POST":
         place, errors = read_place_form()
         place["place_id"] = place_id
         place["image_file"] = current["image_file"]
         if not errors:
+            options = place.pop("options")
             place["image_file"] = save_photo(place_id, current["image_file"])
             execute("""
                 UPDATE places SET name = %(name)s, category_id = %(category_id)s,
@@ -263,12 +352,14 @@ def edit_place(place_id):
                     description = %(description)s, keywords = %(keywords)s,
                     latitude = %(latitude)s, longitude = %(longitude)s,
                     distance_km = %(distance_km)s, opening_hours = %(opening_hours)s,
-                    visit_duration_min = %(visit_duration_min)s, entry_fee = %(entry_fee)s,
+                    open_time = %(open_time)s, close_time = %(close_time)s,
+                    closed_days = %(closed_days)s, visit_duration_min = %(visit_duration_min)s, entry_fee = %(entry_fee)s,
                     travel_tips = %(travel_tips)s, contact = %(contact)s,
                     image_file = %(image_file)s
                 WHERE place_id = %(place_id)s
             """, place)
             save_links(place_id, place)
+            save_visit_options(place_id, options)
             flash(f"{place['name']} was updated.")
             return redirect(url_for("admin.dashboard"))
         for error in errors:

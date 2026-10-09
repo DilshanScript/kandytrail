@@ -957,8 +957,16 @@ img.missing {
     display: none;
 }
 
-.option input {
+.option {
+    position: relative;
+}
+
+.option input,
+.field .option input {
     position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
     opacity: 0;
 }
 
@@ -1670,11 +1678,13 @@ img.missing {
 
 .place-form {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 16px;
 }
 
 .form-card {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 14px;
     padding: 20px;
     border-radius: var(--radius);
@@ -1830,6 +1840,298 @@ img.missing {
     border-color: var(--blue);
     background: #EAF6FF;
     color: var(--blue);
+}
+
+.time-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 10px;
+}
+
+.time-pick {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.time-button {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-width: 150px;
+    padding: 12px 14px;
+    border: 2px solid #E6EEF7;
+    border-radius: 14px;
+    background: var(--white);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color var(--ease), box-shadow var(--ease), opacity var(--ease);
+}
+
+.time-button svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: var(--blue);
+    stroke-width: 2;
+    stroke-linecap: round;
+}
+
+.time-button.empty .time-text {
+    color: var(--muted);
+    font-weight: 500;
+}
+
+.time-button:hover {
+    border-color: var(--blue-light);
+}
+
+.time-button.open {
+    border-color: var(--blue);
+    box-shadow: 0 0 0 4px rgba(0, 154, 255, 0.12);
+}
+
+.time-button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.time-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 300px;
+    max-width: calc(100vw - 32px);
+    padding: 14px;
+    border-radius: 18px;
+    background: var(--white);
+    box-shadow: var(--shadow-hover);
+    animation: menuIn 0.18s ease;
+}
+
+.time-menu[hidden] {
+    display: none;
+}
+
+@keyframes menuIn {
+    from { opacity: 0; transform: translateY(-6px); }
+}
+
+.period-switch {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    padding: 4px;
+    border-radius: 12px;
+    background: #F1F6FB;
+}
+
+.period-switch button {
+    padding: 8px;
+    border: none;
+    border-radius: 9px;
+    background: none;
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background var(--ease), color var(--ease);
+}
+
+.period-switch button.active {
+    background: var(--gradient);
+    color: var(--white);
+    box-shadow: var(--shadow-blue);
+}
+
+.time-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.time-columns small {
+    display: block;
+    margin-bottom: 6px;
+}
+
+.time-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+}
+
+.time-grid button {
+    padding: 7px 0;
+    border: none;
+    border-radius: 9px;
+    background: #F7F9FC;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background var(--ease), color var(--ease);
+}
+
+.time-grid button:hover {
+    background: #EAF6FF;
+    color: var(--blue);
+}
+
+.time-grid button.active {
+    background: var(--gradient);
+    color: var(--white);
+}
+
+.time-done {
+    width: 100%;
+}
+
+@media (max-width: 899px) {
+    .time-menu {
+        position: fixed;
+        top: auto;
+        right: 12px;
+        bottom: 12px;
+        left: 12px;
+        width: auto;
+        max-width: none;
+        box-shadow: 0 0 0 100vmax rgba(20, 30, 45, 0.35), var(--shadow-hover);
+        animation: sheetIn 0.22s ease;
+    }
+
+    .time-grid button {
+        padding: 11px 0;
+        font-size: 16px;
+    }
+}
+
+@keyframes sheetIn {
+    from { opacity: 0; transform: translateY(30px); }
+}
+
+/* very small phones: no room for the admin badge */
+@media (max-width: 359px) {
+    .admin-badge {
+        display: none;
+    }
+}
+
+.time-row .option span {
+    padding: 11px 14px;
+}
+
+.day-picks .option span {
+    padding: 6px 12px;
+    font-size: 14px;
+}
+
+.visit-options {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.visit-option {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) 76px 40px;
+    align-items: center;
+    gap: 8px;
+}
+
+.default-pick {
+    position: relative;
+}
+
+.visit-option .default-pick input {
+    position: absolute;
+    width: auto;
+    opacity: 0;
+}
+
+.default-pick span {
+    display: block;
+    padding: 11px 12px;
+    border: 2px solid #E6EEF7;
+    border-radius: 14px;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: border-color var(--ease), color var(--ease), background var(--ease);
+}
+
+.default-pick:hover span {
+    border-color: var(--blue-light);
+    color: var(--blue);
+}
+
+.default-pick input:checked + span {
+    border-color: var(--blue);
+    background: #EAF6FF;
+    color: var(--blue);
+}
+
+.default-pick input:focus-visible + span {
+    outline: 2px solid var(--blue-light);
+    outline-offset: 2px;
+}
+
+.remove-option {
+    width: 40px;
+    height: 40px;
+    border: none;
+    border-radius: 12px;
+    background: #F1F6FB;
+    color: var(--muted);
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    transition: color var(--ease), background var(--ease);
+}
+
+.remove-option:hover {
+    background: #FDECEC;
+    color: #C62828;
+}
+
+.remove-option[hidden] {
+    display: block;
+    visibility: hidden;
+}
+
+.add-option {
+    align-self: flex-start;
+    padding: 8px 14px;
+    border: 2px dashed #CFE3F5;
+    border-radius: 14px;
+    background: none;
+    color: var(--blue);
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: border-color var(--ease), background var(--ease);
+}
+
+.add-option:hover {
+    border-color: var(--blue);
+    background: #EAF6FF;
+}
+
+.add-option[hidden] {
+    display: none;
 }
 
 .admin-search-wrap {

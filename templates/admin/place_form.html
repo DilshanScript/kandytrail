@@ -77,31 +77,66 @@
 
     <section class="form-card">
         <h2>Visit information</h2>
-        <div class="field-row">
-            <label class="field">
-                <span>Opening hours</span>
-                <input type="text" name="opening_hours" value="{{ place.opening_hours or '' }}" maxlength="200" placeholder="e.g. Daily 8:00am - 5:00pm">
-                <span class="quick-picks" data-target="opening_hours">
-                    <button type="button" data-value="Open all day">Open all day</button>
-                    <button type="button" data-value="Daily 6:00am - 6:00pm">6am - 6pm</button>
-                    <button type="button" data-value="Daily 8:00am - 5:00pm">8am - 5pm</button>
-                    <button type="button" data-value="Daily 9:00am - 5:00pm">9am - 5pm</button>
-                    <button type="button" data-value="Daily 7:00am - 9:00pm">7am - 9pm</button>
-                </span>
-            </label>
-            <label class="field">
-                <span>Time needed (minutes)</span>
-                <input type="number" name="visit_duration_min" value="{{ place.visit_duration_min or '' }}" min="5" max="720" step="5" placeholder="e.g. 60">
-                <span class="quick-picks" data-target="visit_duration_min">
-                    <button type="button" data-value="30">30 min</button>
-                    <button type="button" data-value="60">1 h</button>
-                    <button type="button" data-value="90">1.5 h</button>
-                    <button type="button" data-value="120">2 h</button>
-                    <button type="button" data-value="180">3 h</button>
-                    <button type="button" data-value="240">Half day</button>
-                </span>
-            </label>
+        <div class="field">
+            <span>Opening hours *</span>
+            <div class="time-row">
+                <div class="time-pick">
+                    <small>Opens</small>
+                    <input type="hidden" name="open_time" id="openTime" value="{{ place.open_time or '' }}" data-default="08:00">
+                    <button type="button" class="time-button" data-for="openTime">
+                        <span class="time-text"></span>
+                        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                    </button>
+                </div>
+                <div class="time-pick">
+                    <small>Closes</small>
+                    <input type="hidden" name="close_time" id="closeTime" value="{{ place.close_time or '' }}" data-default="17:00">
+                    <button type="button" class="time-button" data-for="closeTime">
+                        <span class="time-text"></span>
+                        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                    </button>
+                </div>
+                <label class="option">
+                    <input type="checkbox" name="open_all_day" id="openAllDay" {% if not place.open_time %}checked{% endif %}>
+                    <span>Open all day</span>
+                </label>
+            </div>
+            <span class="quick-picks time-presets">
+                <button type="button" data-open="06:00" data-close="18:00">6am - 6pm</button>
+                <button type="button" data-open="08:00" data-close="17:00">8am - 5pm</button>
+                <button type="button" data-open="09:00" data-close="17:00">9am - 5pm</button>
+                <button type="button" data-open="07:00" data-close="21:00">7am - 9pm</button>
+            </span>
+            <small>Closed on</small>
+            <div class="pick-group day-picks">
+                {% for day in ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] %}
+                    <label class="option">
+                        <input type="checkbox" name="closed_days" value="{{ day }}" {% if day in (place.closed_days or '') %}checked{% endif %}>
+                        <span>{{ day }}</span>
+                    </label>
+                {% endfor %}
+            </div>
+            <p class="form-hint hours-preview">Visitors will see: <strong id="hoursPreview"></strong></p>
         </div>
+
+        <div class="field">
+            <span>Ways to visit * <small>tick the usual one, the trip planner uses it first and visitors can switch</small></span>
+            <div class="visit-options" id="visitOptions">
+                {% for option in place.options or [{"label": "Standard visit", "duration_min": "", "is_default": true}] %}
+                    <div class="visit-option">
+                        <label class="default-pick">
+                            <input type="radio" name="default_option" value="{{ loop.index0 }}" {% if option.is_default %}checked{% endif %}>
+                            <span>Usual</span>
+                        </label>
+                        <input type="text" name="option_label" value="{{ option.label }}" maxlength="80" placeholder="e.g. Quick worship" aria-label="Name">
+                        <input type="number" name="option_minutes" value="{{ option.duration_min }}" min="5" max="720" step="5" placeholder="min" aria-label="Minutes">
+                        <button type="button" class="remove-option" aria-label="Remove">&times;</button>
+                    </div>
+                {% endfor %}
+            </div>
+            <button type="button" class="add-option" id="addOption">+ Add another way</button>
+        </div>
+
         <div class="field-row">
             <label class="field">
                 <span>Entry fee</span>
