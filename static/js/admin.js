@@ -196,41 +196,26 @@ document.querySelectorAll(".counter").forEach(counter => {
     update();
 });
 
-// opening hours: time picker, presets and the line visitors will see
+// opening hours: presets and the line visitors will see
 const openAllDay = document.getElementById("openAllDay");
 if (openAllDay) {
     const openTime = document.getElementById("openTime");
     const closeTime = document.getElementById("closeTime");
-    const timeButtons = document.querySelectorAll(".time-button");
     const preview = document.getElementById("hoursPreview");
     const dayChecks = document.querySelectorAll("[name='closed_days']");
 
-    function niceTime(text, spaced) {
-        const [hour, minute] = text.split(":").map(Number);
-        const period = hour < 12 ? "am" : "pm";
-        const clock = `${hour % 12 || 12}:${String(minute).padStart(2, "0")}`;
-        return spaced ? `${clock} ${period.toUpperCase()}` : clock + period;
-    }
-
-    function setTime(input, value) {
-        input.value = value;
-        input.dispatchEvent(new Event("input", { bubbles: true }));
-        updateHours();
+    function shortTime(value) {
+        return TimePicker.niceTime(value).replace(" ", "").toLowerCase();
     }
 
     function updateHours() {
-        timeButtons.forEach(button => {
-            const input = document.getElementById(button.dataset.for);
-            button.disabled = openAllDay.checked;
-            button.querySelector(".time-text").textContent = input.value ? niceTime(input.value, true) : "Pick a time";
-            button.classList.toggle("empty", !input.value);
-        });
+        document.querySelectorAll(".time-button").forEach(button => button.disabled = openAllDay.checked);
 
         const closed = [...dayChecks].filter(c => c.checked).map(c => c.value);
         let text = "Open all day";
         if (!openAllDay.checked) {
             text = openTime.value && closeTime.value
-                ? `${niceTime(openTime.value)} - ${niceTime(closeTime.value)}`
+                ? `${shortTime(openTime.value)} - ${shortTime(closeTime.value)}`
                 : "--";
             if (!closed.length && text !== "--") text = `Daily ${text}`;
         }
@@ -243,98 +228,18 @@ if (openAllDay) {
         });
     }
 
-    // popup with hour, minute and AM / PM chips
-    const menu = document.createElement("div");
-    menu.className = "time-menu";
-    menu.hidden = true;
-    menu.innerHTML = `
-        <div class="period-switch">
-            <button type="button" data-period="am">AM</button>
-            <button type="button" data-period="pm">PM</button>
-        </div>
-        <div class="time-columns">
-            <div><small>Hour</small><div class="time-grid" data-part="hour"></div></div>
-            <div><small>Minutes</small><div class="time-grid" data-part="minute"></div></div>
-        </div>
-        <button type="button" class="btn btn-primary time-done">Done</button>`;
-    for (let h = 1; h <= 12; h++) {
-        menu.querySelector("[data-part='hour']").insertAdjacentHTML("beforeend", `<button type="button" data-value="${h}">${h}</button>`);
-    }
-    for (let m = 0; m < 60; m += 5) {
-        menu.querySelector("[data-part='minute']").insertAdjacentHTML("beforeend",
-            `<button type="button" data-value="${m}">${String(m).padStart(2, "0")}</button>`);
-    }
-    let activeInput = null;
-
-    function showMenu() {
-        const value = activeInput.value || activeInput.dataset.default;
-        const [hour, minute] = value.split(":").map(Number);
-        menu.querySelectorAll("[data-part='hour'] button").forEach(b => b.classList.toggle("active", +b.dataset.value === (hour % 12 || 12)));
-        menu.querySelectorAll("[data-part='minute'] button").forEach(b => b.classList.toggle("active", +b.dataset.value === minute));
-        menu.querySelectorAll("[data-period]").forEach(b => b.classList.toggle("active", b.dataset.period === (hour < 12 ? "am" : "pm")));
-    }
-
-    function closeMenu() {
-        menu.hidden = true;
-        timeButtons.forEach(b => b.classList.remove("open"));
-        activeInput = null;
-    }
-
-    timeButtons.forEach(button => {
-        button.addEventListener("click", () => {
-            const input = document.getElementById(button.dataset.for);
-            if (activeInput === input) return closeMenu();
-            closeMenu();
-            activeInput = input;
-            button.parentElement.appendChild(menu);
-            button.classList.add("open");
-            menu.hidden = false;
-            showMenu();
-
-            // keep the popup inside the screen, phones show it as a bottom sheet
-            menu.style.left = "";
-            if (window.matchMedia("(min-width: 900px)").matches) {
-                const overflow = menu.getBoundingClientRect().right - (window.innerWidth - 16);
-                if (overflow > 0) menu.style.left = `${-overflow}px`;
-            }
-        });
-    });
-
-    menu.addEventListener("click", event => {
-        const choice = event.target.closest("button");
-        if (!choice || !activeInput) return;
-        if (choice.classList.contains("time-done")) return closeMenu();
-
-        let [hour, minute] = (activeInput.value || activeInput.dataset.default).split(":").map(Number);
-        const pm = hour >= 12;
-        const part = choice.closest("[data-part]")?.dataset.part;
-        if (part === "hour") hour = (+choice.dataset.value % 12) + (pm ? 12 : 0);
-        if (part === "minute") minute = +choice.dataset.value;
-        if (choice.dataset.period) hour = (hour % 12) + (choice.dataset.period === "pm" ? 12 : 0);
-
-        setTime(activeInput, `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`);
-        showMenu();
-    });
-
-    document.addEventListener("click", event => {
-        if (activeInput && !event.target.closest(".time-pick")) closeMenu();
-    });
-    document.addEventListener("keydown", event => {
-        if (event.key === "Escape" && activeInput) closeMenu();
-    });
-
     document.querySelectorAll(".time-presets button").forEach(button => {
         button.addEventListener("click", () => {
             openAllDay.checked = false;
-            setTime(openTime, button.dataset.open);
-            setTime(closeTime, button.dataset.close);
+            TimePicker.set(openTime, button.dataset.open);
+            TimePicker.set(closeTime, button.dataset.close);
         });
     });
     openAllDay.addEventListener("change", () => {
-        closeMenu();
+        TimePicker.close();
         updateHours();
     });
-    dayChecks.forEach(check => check.addEventListener("change", updateHours));
+    [openTime, closeTime, ...dayChecks].forEach(input => input.addEventListener("change", updateHours));
     updateHours();
 }
 
