@@ -1,10 +1,13 @@
 import os
-from datetime import date
+from datetime import date, datetime, time, timedelta
+from urllib.parse import urlencode
 
-from flask import Flask, abort, jsonify, render_template, request
+from flask import Flask, abort, jsonify, redirect, render_template, request, session, url_for
 
-from admin import admin
+from admin import admin, hours_text, time_text
 from db import query_all, query_one
+from planner import KANDY, best_order, build_timeline, load_options, load_places, plan_trip, straight_km
+from routing import RoutingError
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "dev-only-change-me")
@@ -24,6 +27,29 @@ CARD_COLUMNS = """p.place_id, p.name, p.short_description, p.distance_km, p.imag
 @app.context_processor
 def inject_today():
     return {"today": date.today()}
+
+
+@app.template_filter("duration")
+def duration(minutes):
+    # 207 -> "3 hr 27 min"
+    hours, mins = divmod(int(minutes), 60)
+    if not hours:
+        return f"{mins} min"
+    return f"{hours} hr {mins} min" if mins else f"{hours} hr"
+
+
+@app.template_global()
+def icon_url(name):
+    # your own PNG icon if you added one, otherwise the built-in SVG
+    folder = os.path.join(app.static_folder, "images", "icons")
+    file = f"{name}.png" if os.path.exists(os.path.join(folder, f"{name}.png")) else f"{name}.svg"
+    return url_for("static", filename=f"images/icons/{file}")
+
+
+@app.template_filter("clock")
+def clock(moment):
+    # datetime -> "8:05 AM"
+    return moment.strftime("%I:%M %p").lstrip("0")
 
 
 @app.route("/")
@@ -168,6 +194,265 @@ def place_details(place_id):
         """, (place["longitude"], place["latitude"], place_id))
 
     return render_template("place_details.html", place=place, reviews=reviews, nearby=nearby)
+
+
+# name and a short note shown on the wizard card
+VEHICLES = {
+    "car": ("Car", "Your own or a hired car"),
+    "van": ("Van", "Hired van for a group"),
+    "bike": ("Motorbike", "Scooter or motorbike"),
+    "tuktuk": ("Tuk-tuk", "Hired three-wheeler"),
+    "bus": ("Hired bus", "Private tour bus, not public transport"),
+}
+MAX_DAYS_AHEAD = 90
+WALK_KM = 0.8  # places closer than this can be reached on foot
+LEG_COLORS = ["#009AFF", "#7C4DFF", "#00B894", "#FF8A00", "#E84393", "#1E88E5"]
+
+
+@app.route("/plan")
+def plan_wizard():
+    categories = query_all("SELECT category_id, name FROM categories ORDER BY category_id")
+    sub_types = query_all("SELECT sub_type_id, category_id, name FROM sub_types ORDER BY sub_type_id")
+    days = [date.today() + timedelta(days=i) for i in range(7)]
+    return render_template("plan_wizard.html", categories=categories, sub_types=sub_types,
+                           days=days, vehicles=VEHICLES,
+                           last_day=date.today() + timedelta(days=MAX_DAYS_AHEAD),
+                           maps_key=os.getenv("GOOGLE_MAPS_KEY", ""))
+
+
+FINISH = {"start": "Back at your start point", "kandy": "Kandy city centre", "last": "At the last place"}
+
+
+def add_walk_tips(plan):
+    """Mark stops that are a short walk from the one before."""
+    for before, stop in zip(plan["stops"], plan["stops"][1:]):
+        km = straight_km(before["place"]["point"], stop["place"]["point"])
+        if km <= WALK_KM:
+            stop["walk"] = {"from": before["place"]["name"],
+                            "min": max(1, round(km * 1.3 / 4.5 * 60))}  # about 4.5 km/h on foot
+
+
+def directions_url(points, travel):
+    """Google Maps link that drives through the points in order."""
+    query = {"api": 1, "origin": "%f,%f" % points[0], "destination": "%f,%f" % points[-1], "travelmode": travel}
+    if len(points) > 2:
+        query["waypoints"] = "|".join("%f,%f" % p for p in points[1:-1])
+    return "https://www.google.com/maps/dir/?" + urlencode(query)
+
+
+def add_directions(plan):
+    """One link for each drive, and the whole trip split into parts of up to 9 stops."""
+    points = [plan["start"]] + [stop["place"]["point"] for stop in plan["stops"]]
+    if plan["end_point"]:
+        points.append(plan["end_point"])
+    for i, stop in enumerate(plan["stops"]):
+        stop["directions"] = directions_url(points[i:i + 2], "driving")
+    if plan["back"]:
+        plan["back"]["directions"] = directions_url(points[-2:], "driving")
+    # Google Maps links allow up to 9 stops between start and finish
+    plan["trip_links"] = [directions_url(points[i:i + 11], "driving") for i in range(0, len(points) - 1, 10)]
+
+
+def map_data(plan):
+    """Pins and road lines for the plan map."""
+    pins = [{"lat": plan["start"][0], "lng": plan["start"][1], "name": plan["start_label"], "label": "S"}]
+    for number, stop in enumerate(plan["stops"], 1):
+        pins.append({"lat": stop["place"]["point"][0], "lng": stop["place"]["point"][1],
+                     "name": stop["place"]["name"], "label": str(number),
+                     "time": f"{clock(stop['arrive'])} - {clock(stop['leave'])}"})
+    if plan["end_point"]:
+        pins.append({"lat": plan["end_point"][0], "lng": plan["end_point"][1], "name": plan["end_label"],
+                     "label": "E", "time": clock(plan["finish"])})
+    legs = [{"line": line, "color": LEG_COLORS[i % len(LEG_COLORS)]} for i, line in enumerate(plan["lines"])]
+    return {"pins": pins, "legs": legs}
+
+
+@app.route("/plan", methods=["POST"])
+def plan_create():
+    form = request.form
+    lat = form.get("start_lat", type=float)
+    lng = form.get("start_lng", type=float)
+    vehicle = form.get("vehicle")
+    interests = form.getlist("interests", type=int)
+    finish = form.get("finish", "start")
+
+    try:
+        day = date.fromisoformat(form.get("day", ""))
+        depart = datetime.combine(day, time.fromisoformat(form.get("start_time", "")))
+        end = datetime.combine(day, time.fromisoformat(form.get("end_time", "")))
+    except ValueError:
+        return render_template("plan_result.html", error="Please choose a date, start time and end time.")
+    if not date.today() <= day <= date.today() + timedelta(days=MAX_DAYS_AHEAD):
+        return render_template("plan_result.html", error="Please choose a date within the next 3 months.")
+
+    if lat is None or lng is None:
+        error = "Please choose where you will start."
+    elif not interests:
+        error = "Please pick at least one interest."
+    elif vehicle not in VEHICLES:
+        error = "Please choose how you will travel."
+    elif finish not in FINISH:
+        error = "Please choose where your trip ends."
+    elif end - depart < timedelta(hours=2):
+        error = "Your trip needs at least 2 hours between the start and end time."
+    else:
+        error = None
+    if error:
+        return render_template("plan_result.html", error=error)
+
+    end_point = {"start": (lat, lng), "kandy": KANDY, "last": None}[finish]
+    # picked sub-types grouped by their category
+    picked = set(form.getlist("sub_types", type=int))
+    sub_types = {}
+    for row in query_all("SELECT sub_type_id, category_id FROM sub_types"):
+        if row["sub_type_id"] in picked:
+            sub_types.setdefault(row["category_id"], set()).add(row["sub_type_id"])
+
+    dining = query_one("SELECT category_id FROM categories WHERE name = 'Dining'")
+    try:
+        plan = plan_trip((lat, lng), depart, end, interests, vehicle,
+                         lunch=form.get("lunch") == "yes",
+                         breakfast=form.get("breakfast") == "yes",
+                         dining_id=dining["category_id"] if dining else None,
+                         end_point=end_point, sub_type_ids=sub_types)
+    except RoutingError:
+        return render_template("plan_result.html",
+                               error="We couldn't get travel times right now. Please try again in a moment.")
+
+    # keep only the choices in the session, times are worked out again on every view
+    stops = [{"id": stop["place"]["place_id"], "option": None, "meal": stop["meal"]} for stop in plan["stops"]]
+    session["plan"] = {
+        "start": [lat, lng], "start_label": form.get("start_label") or "Your start point",
+        "depart": depart.isoformat(), "end": end.isoformat(), "vehicle": vehicle, "finish": finish,
+        "stops": stops, "suggested": stops, "undo": None, "notes": plan["notes"],
+    }
+    return redirect(url_for("plan_result"))
+
+
+def end_of(saved):
+    """End point and its name for a saved plan."""
+    finish = saved.get("finish", "kandy")
+    point = {"start": tuple(saved["start"]), "kandy": KANDY, "last": None}[finish]
+    label = saved["start_label"] if finish == "start" else FINISH[finish]
+    return point, label
+
+
+def plan_places(saved):
+    """Place details for the saved stops, using the chosen way to visit."""
+    places = {p["place_id"]: p for p in load_places()}
+    options = load_options([stop["id"] for stop in saved["stops"]])
+    stops = []
+    for stop in saved["stops"]:
+        place = places.get(stop["id"])
+        if place is None:
+            continue  # place was deleted by the admin
+        place = dict(place, options=options.get(stop["id"], []))
+        for option in place["options"]:
+            if option["option_id"] == stop["option"]:
+                place["stay_min"], place["stay_label"] = option["duration_min"], option["label"]
+        stops.append({"place": place, "meal": stop["meal"], "option": stop["option"]})
+    return stops, places
+
+
+@app.route("/plan/result")
+def plan_result():
+    saved = session.get("plan")
+    if not saved:
+        return redirect(url_for("plan_wizard"))
+
+    stops, places = plan_places(saved)
+    end_point, end_label = end_of(saved)
+    plan = build_timeline(tuple(saved["start"]), datetime.fromisoformat(saved["depart"]),
+                          saved["vehicle"], stops, end_point)
+    plan["start"] = tuple(saved["start"])
+    plan["start_label"] = saved["start_label"]
+    plan["end_point"], plan["end_label"] = end_point, end_label
+    plan["finish_type"] = saved.get("finish", "kandy")
+    plan["end"] = datetime.fromisoformat(saved["end"])
+    plan["vehicle"] = VEHICLES[saved["vehicle"]][0]
+    plan["vehicle_key"] = saved["vehicle"]
+    back = plan["back"] or {"drive_min": 0, "km": 0}
+    plan["drive_min"] = sum(stop["drive_min"] for stop in plan["stops"]) + back["drive_min"]
+    plan["km"] = round(sum(stop["km"] for stop in plan["stops"]) + back["km"], 1)
+    plan["late_min"] = round((plan["finish"] - plan["end"]).total_seconds() / 60)
+    for number, stop in enumerate(plan["stops"]):
+        stop["color"] = LEG_COLORS[number % len(LEG_COLORS)]
+        # show the same hours the planner works with
+        place = stop["place"]
+        stop["hours"] = hours_text(time_text(place["open_time"]), time_text(place["close_time"]), place["closed_days"])
+    if plan["back"]:
+        plan["back"]["color"] = LEG_COLORS[len(plan["stops"]) % len(LEG_COLORS)]
+    add_walk_tips(plan)
+    add_directions(plan)
+
+    # places that can be added, with their position for sorting near any gap
+    in_plan = {stop["id"] for stop in saved["stops"]}
+    categories = {c["category_id"]: c["name"] for c in query_all("SELECT category_id, name FROM categories")}
+    extra = [p for p in places.values() if p["place_id"] not in in_plan]
+    for place in extra:
+        place["category_names"] = ", ".join(categories[c] for c in sorted(place["category_ids"]) if c in categories)
+    extra.sort(key=lambda p: p["name"])
+    gaps = [plan["start"]] + [stop["place"]["point"] for stop in plan["stops"]]
+
+    return render_template("plan_result.html", plan=plan, map=map_data(plan) if plan["stops"] else None,
+                           extra=extra, gaps=gaps, notes=saved.get("notes", []), editing=request.args.get("edit") == "1",
+                           can_undo=bool(saved["undo"]), changed=saved["stops"] != saved["suggested"],
+                           maps_key=os.getenv("GOOGLE_MAPS_KEY", ""))
+
+
+def best_spot(stops, place, start, end_point):
+    """Position where a new place adds the least extra distance."""
+    points = [start] + [stop["point"] for stop in stops] + [end_point or (stops[-1]["point"] if stops else start)]
+    extra = [straight_km(a, place) + straight_km(place, b) - straight_km(a, b)
+             for a, b in zip(points, points[1:])]
+    return extra.index(min(extra))
+
+
+@app.route("/plan/edit", methods=["POST"])
+def plan_edit():
+    saved = session.get("plan")
+    if not saved:
+        return redirect(url_for("plan_wizard"))
+    stops = [dict(stop) for stop in saved["stops"]]
+    action = request.form.get("action")
+    index = request.form.get("index", type=int)
+    valid = index is not None and 0 <= index < len(stops)
+
+    if action == "undo" and saved["undo"] is not None:
+        saved["stops"], saved["undo"] = saved["undo"], None
+    elif action == "reset":
+        saved["undo"], saved["stops"] = saved["stops"], saved["suggested"]
+    else:
+        if action == "up" and valid and index > 0:
+            stops[index - 1], stops[index] = stops[index], stops[index - 1]
+        elif action == "down" and valid and index < len(stops) - 1:
+            stops[index + 1], stops[index] = stops[index], stops[index + 1]
+        elif action == "remove" and valid:
+            stops.pop(index)
+        elif action == "stay" and valid:
+            stops[index]["option"] = request.form.get("option", type=int)
+        elif action == "add":
+            place_id = request.form.get("place_id", type=int)
+            places = {p["place_id"]: p for p in load_places()}
+            if place_id in places and place_id not in [stop["id"] for stop in stops]:
+                spot = request.form.get("position", type=int)
+                if spot is None or not 0 <= spot <= len(stops):
+                    spot = best_spot([places[stop["id"]] for stop in stops if stop["id"] in places],
+                                     places[place_id]["point"], tuple(saved["start"]), end_of(saved)[0])
+                stops.insert(spot, {"id": place_id, "option": None, "meal": None})
+                index = spot
+        elif action == "best":
+            full, _ = plan_places(saved)
+            ordered = best_order(tuple(saved["start"]), full, end_of(saved)[0],
+                                 datetime.fromisoformat(saved["depart"]))
+            stops = [{"id": s["place"]["place_id"], "option": s["option"], "meal": s["meal"]} for s in ordered]
+        saved["undo"], saved["stops"] = saved["stops"], stops
+
+    session["plan"] = saved  # tell Flask the session changed
+    # scroll back to the stop that was changed
+    focus = {"up": -1, "down": 1, "stay": 0, "add": 0}.get(action)
+    anchor = f"#stop-{index + focus + 1}" if focus is not None and index is not None else ""
+    return redirect(url_for("plan_result", edit=1) + anchor)
 
 
 @app.errorhandler(404)

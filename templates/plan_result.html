@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+
+{% block title %}Your trip plan - KandyTrail{% endblock %}
+
+{% block content %}
+<div class="plan-page">
+    <a href="{{ url_for('plan_wizard') }}" class="back-link">
+        <svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
+        Plan again
+    </a>
+
+    {% if error %}
+        <div class="plan-empty">
+            <img src="{{ icon_url('alert') }}" alt="">
+            <h1>We couldn't plan this trip</h1>
+            <p>{{ error }}</p>
+            <a href="{{ url_for('plan_wizard') }}" class="btn btn-primary">Try again</a>
+        </div>
+    {% elif not plan.stops %}
+        <div class="plan-empty">
+            <img src="{{ icon_url('map') }}" alt="">
+            <h1>No places fit this trip</h1>
+            <p>Try a later end time, more interests, or a start point closer to Kandy.</p>
+            <a href="{{ url_for('plan_wizard') }}" class="btn btn-primary">Change my answers</a>
+        </div>
+    {% else %}
+        <h1>Your day in Kandy</h1>
+        <p class="plan-sub">{{ plan.depart.strftime("%A %d %B") }} &middot; by {{ plan.vehicle|lower }}</p>
+
+        <div class="plan-stats">
+            <div><strong>{{ plan.stops|length }}</strong><small>stops</small></div>
+            <div><strong>{{ plan.drive_min|duration }}</strong><small>on the road</small></div>
+            <div><strong>{{ plan.km }} km</strong><small>in total</small></div>
+            <div><strong>{{ plan.finish|clock }}</strong><small>day ends</small></div>
+        </div>
+
+        {% if plan.late_min > 40 %}
+            <div class="plan-alert">
+                <img src="{{ icon_url('alert') }}" alt="">
+                <p>Your day ends {{ plan.late_min|duration }} after your {{ plan.end|clock }} end time.
+                Remove a place, pick a shorter visit or try Best order.</p>
+            </div>
+        {% endif %}
+        {% for note in notes %}
+            <p class="plan-note">{{ note }}</p>
+        {% endfor %}
+        {% if plan.estimated %}
+            <p class="plan-note">We couldn't reach Google just now, so these drive times are rough guesses.</p>
+        {% endif %}
+
+        <div class="plan-map" id="planMap" data-plan="{{ map|tojson|forceescape }}"></div>
+
+        <div class="plan-heading">
+            <h2>Step by step</h2>
+            {% if changed %}
+                <form method="post" action="{{ url_for('plan_edit') }}" class="edit-only">
+                    <button name="action" value="reset" class="text-button">Back to suggested plan</button>
+                </form>
+            {% endif %}
+        </div>
+
+        <div class="plan-body{% if editing %} editing{% endif %}" id="planBody">
+        <ol class="plan-list">
+            <li class="plan-point">
+                <span class="plan-pin start">S</span>
+                <div>
+                    <span class="plan-time">{{ plan.depart|clock }}</span>
+                    <strong>Leave {{ plan.start_label }}</strong>
+                </div>
+            </li>
+            {% for stop in plan.stops %}
+                <li class="plan-drive" style="--leg: {{ stop.color }}">
+                    <img src="{{ icon_url(plan.vehicle_key) }}" alt="">
+                    <span>{{ stop.km }} km &middot; {{ stop.drive_min|duration }} drive{% if stop.walk %} or {{ stop.walk.min }} min walk{% endif %}</span>
+                    <a href="{{ stop.directions }}" target="_blank" rel="noopener" class="leg-link">Directions</a>
+                    <button type="button" class="add-here edit-only" data-position="{{ loop.index0 }}">+ Add a stop here</button>
+                    {% if stop.walk %}
+                        <span class="plan-tip">
+                            <img src="{{ icon_url('walk') }}" alt="">
+                            <span><strong>Tip:</strong> {{ stop.place.name }} is just {{ stop.walk.min }} min on foot from
+                            {{ stop.walk.from }}. Keep the vehicle parked and walk there.</span>
+                        </span>
+                    {% endif %}
+                </li>
+                <li class="plan-stop" id="stop-{{ loop.index }}" data-pin="{{ loop.index }}">
+                    <span class="plan-pin" style="--leg: {{ stop.color }}">{{ loop.index }}</span>
+                    <div class="plan-card">
+                        {% if stop.place.image_file %}
+                            <img class="plan-photo" src="{{ url_for('static', filename='images/places/' ~ stop.place.image_file) }}" alt="">
+                        {% endif %}
+                        <div>
+                            <span class="plan-time">{{ stop.arrive|clock }} - {{ stop.leave|clock }}</span>
+                            <a href="{{ url_for('place_details', place_id=stop.place.place_id) }}"><strong>{{ stop.place.name }}</strong></a>
+                            <small>
+                                {% if stop.start > stop.arrive %}Opens at {{ stop.start|clock }}, {% endif %}
+                                {{ stop.place.stay_label or "Visit" }} &middot; {{ stop.place.stay_min|duration }}
+                            </small>
+                            <small class="plan-hours">{{ stop.hours }}</small>
+                            {% if stop.meal %}
+                                <span class="plan-tag"><img src="{{ icon_url(stop.meal) }}" alt="">{{ stop.meal|capitalize }} stop</span>
+                            {% endif %}
+                            {% if stop.problem %}
+                                <span class="plan-problem">{{ stop.problem }}</span>
+                            {% endif %}
+
+                            <div class="stop-edit edit-only">
+                                {% if stop.place.options|length > 1 %}
+                                    <form method="post" action="{{ url_for('plan_edit') }}" class="stay-form">
+                                        <input type="hidden" name="action" value="stay">
+                                        <input type="hidden" name="index" value="{{ loop.index0 }}">
+                                        <label>
+                                            <small>Time here</small>
+                                            <select name="option" onchange="this.form.submit()">
+                                                {% for option in stop.place.options %}
+                                                    <option value="{{ option.option_id }}"
+                                                        {% if option.label == stop.place.stay_label and option.duration_min == stop.place.stay_min %}selected{% endif %}>
+                                                        {{ option.label }} ({{ option.duration_min|duration }})
+                                                    </option>
+                                                {% endfor %}
+                                            </select>
+                                        </label>
+                                        <noscript><button>Save</button></noscript>
+                                    </form>
+                                {% endif %}
+                                <form method="post" action="{{ url_for('plan_edit') }}" class="move-buttons">
+                                    <input type="hidden" name="index" value="{{ loop.index0 }}">
+                                    <button name="action" value="up" aria-label="Move earlier" {% if loop.first %}disabled{% endif %}>
+                                        <svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg>
+                                    </button>
+                                    <button name="action" value="down" aria-label="Move later" {% if loop.last %}disabled{% endif %}>
+                                        <svg viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"/></svg>
+                                    </button>
+                                    <button name="action" value="remove" class="remove" aria-label="Remove" {% if plan.stops|length == 1 %}disabled{% endif %}>
+                                        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </li>
+            {% endfor %}
+            <li class="plan-add edit-only">
+                <button type="button" class="add-here" data-position="{{ plan.stops|length }}">+ Add a stop at the end</button>
+            </li>
+            {% if plan.back %}
+                <li class="plan-drive" style="--leg: {{ plan.back.color }}">
+                    <img src="{{ icon_url(plan.vehicle_key) }}" alt="">
+                    <span>To {{ plan.end_label }} &middot; {{ plan.back.km }} km &middot; {{ plan.back.drive_min|duration }} drive</span>
+                    <a href="{{ plan.back.directions }}" target="_blank" rel="noopener" class="leg-link">Directions</a>
+                </li>
+            {% endif %}
+            <li class="plan-finish">
+                <img src="{{ icon_url('finish') }}" alt="">
+                <div>
+                    <small>Day ends {% if plan.finish_type == "last" %}at {{ plan.stops[-1].place.name }}{% elif plan.finish_type == "start" %}back at {{ plan.end_label }}{% else %}in Kandy city{% endif %}</small>
+                    <strong>{{ plan.finish|clock }}</strong>
+                </div>
+            </li>
+        </ol>
+
+        <section class="navigate" id="navigate">
+            <h2>Go with Google Maps</h2>
+            <p class="plan-sub">Opens Google Maps with every stop in order, ready to start driving.</p>
+            <div class="navigate-links">
+                {% for link in plan.trip_links %}
+                    <a href="{{ link }}" target="_blank" rel="noopener" class="btn btn-primary">
+                        <img src="{{ icon_url('map') }}" alt="">
+                        {% if plan.trip_links|length > 1 %}Part {{ loop.index }} of the trip{% else %}Open the whole trip{% endif %}
+                    </a>
+                {% endfor %}
+            </div>
+            {% if plan.trip_links|length > 1 %}
+                <p class="wizard-note">Google Maps takes up to 9 stops at a time, so the trip is split into parts.</p>
+            {% endif %}
+        </section>
+        </div>
+
+        <!-- floating buttons, always in reach -->
+        <div class="plan-bar" id="planBar">
+            <div class="view-only">
+                <a href="{{ url_for('plan_result', edit=1) }}" class="btn btn-light" id="editOn">
+                    <svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16zM14 6l4 4"/></svg>
+                    Edit plan
+                </a>
+                <a href="{{ plan.trip_links[0] if plan.trip_links|length == 1 else '#navigate' }}"
+                   {% if plan.trip_links|length == 1 %}target="_blank" rel="noopener"{% endif %} class="btn btn-primary">
+                    <svg viewBox="0 0 24 24"><path d="M3 11l18-8-8 18-2-8z"/></svg>
+                    Directions
+                </a>
+            </div>
+            <div class="edit-only">
+                {% if can_undo %}
+                    <form method="post" action="{{ url_for('plan_edit') }}">
+                        <button name="action" value="undo" class="btn btn-light">Undo</button>
+                    </form>
+                {% endif %}
+                <form method="post" action="{{ url_for('plan_edit') }}">
+                    <button name="action" value="best" class="btn btn-light" title="Reorder stops for the least driving">Best order</button>
+                </form>
+                <a href="{{ url_for('plan_result') }}" class="btn btn-primary" id="editOff">Done</a>
+            </div>
+        </div>
+
+        <!-- list of places to add, opened from any "+ Add a stop" button -->
+        <div class="add-sheet" id="addSheet" hidden data-gaps="{{ gaps|tojson|forceescape }}">
+            <div class="add-box" role="dialog" aria-labelledby="addTitle">
+                <div class="add-head">
+                    <div>
+                        <h2 id="addTitle">Add a stop</h2>
+                        <small id="addWhere"></small>
+                    </div>
+                    <button type="button" class="add-close" id="addClose" aria-label="Close">
+                        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+                    </button>
+                </div>
+                <input type="text" id="addSearch" class="add-search" placeholder="Search places" autocomplete="off">
+                <ul class="add-list" id="addList">
+                    {% for place in extra %}
+                        <li data-name="{{ place.name|lower }}" data-lat="{{ place.point[0] }}" data-lng="{{ place.point[1] }}">
+                            {% if place.image_file %}
+                                <img src="{{ url_for('static', filename='images/places/' ~ place.image_file) }}" alt="">
+                            {% else %}
+                                <span class="add-photo"></span>
+                            {% endif %}
+                            <div>
+                                <strong>{{ place.name }}</strong>
+                                <small>{{ place.category_names }} &middot; {{ place.stay_min|duration }} &middot; <span class="add-km"></span></small>
+                            </div>
+                            <form method="post" action="{{ url_for('plan_edit') }}">
+                                <input type="hidden" name="place_id" value="{{ place.place_id }}">
+                                <input type="hidden" name="position" class="add-position">
+                                <button name="action" value="add" class="btn btn-primary">Add</button>
+                            </form>
+                        </li>
+                    {% else %}
+                        <li class="empty">Every place is already in your plan.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if plan and plan.stops %}
+<script src="{{ url_for('static', filename='js/plan_map.js') }}"></script>
+<script src="{{ url_for('static', filename='js/plan_edit.js') }}"></script>
+{% if maps_key %}
+<script async src="https://maps.googleapis.com/maps/api/js?key={{ maps_key }}&loading=async&callback=initPlanMap"
+        onerror="planMapFailed()"></script>
+{% else %}
+<script>planMapFailed();</script>
+{% endif %}
+{% endif %}
+{% endblock %}
