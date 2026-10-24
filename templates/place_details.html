@@ -45,22 +45,47 @@
             </section>
         {% endif %}
 
-        <section class="details-block reviews">
+        <section class="details-block reviews" id="reviews">
             <h2>Reviews</h2>
-            {% if reviews %}
-                {% for review in reviews %}
-                    <div class="review">
-                        <div class="review-head">
-                            <strong>{{ review.full_name }}</strong>
-                            <span class="stars">{{ "&#9733;"|safe * review.rating }}</span>
-                        </div>
-                        {% if review.comment %}<p>{{ review.comment }}</p>{% endif %}
-                        <span class="review-date">{{ review.created_at.strftime('%d %b %Y') }}</span>
+
+            {% if session.user_id %}
+                <form class="review-form" method="post" action="{{ url_for('traveller.save_review', place_id=place.place_id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <strong>{{ "Your review" if my_review else "Rate this place" }}</strong>
+                    <div class="star-input">
+                        {% for n in range(5, 0, -1) %}
+                            <input type="radio" name="rating" value="{{ n }}" id="star{{ n }}" required {% if my_review and my_review.rating == n %}checked{% endif %}>
+                            <label for="star{{ n }}" title="{{ n }} star{% if n > 1 %}s{% endif %}">&#9733;</label>
+                        {% endfor %}
                     </div>
-                {% endfor %}
+                    <label class="field">
+                        <textarea name="comment" rows="3" maxlength="1000" placeholder="What did you like? Any tips for other travellers?">{{ my_review.comment or "" if my_review }}</textarea>
+                    </label>
+                    <div class="review-actions">
+                        <button type="submit" class="btn btn-primary btn-small">{{ "Update review" if my_review else "Post review" }}</button>
+                        {% if my_review %}
+                            <button type="submit" class="btn btn-danger btn-small" formaction="{{ url_for('traveller.delete_review', place_id=place.place_id) }}" formnovalidate>Delete</button>
+                        {% endif %}
+                    </div>
+                </form>
             {% else %}
-                <p class="muted">No reviews yet. Sign in to be the first to review this place.</p>
+                <p class="review-signin">
+                    <a href="{{ url_for('accounts.login', next=url_for('place_details', place_id=place.place_id) ~ '#reviews') }}">Sign in</a> to rate this place and write a review.
+                </p>
             {% endif %}
+
+            {% for review in reviews %}
+                <div class="review">
+                    <div class="review-head">
+                        <strong>{{ "You" if review.user_id == session.user_id else review.full_name }}</strong>
+                        <span class="stars">{{ "&#9733;"|safe * review.rating }}</span>
+                    </div>
+                    {% if review.comment %}<p>{{ review.comment }}</p>{% endif %}
+                    <span class="review-date">{{ review.created_at.strftime('%d %b %Y') }}</span>
+                </div>
+            {% else %}
+                <p class="muted">No reviews yet. Be the first to review this place.</p>
+            {% endfor %}
         </section>
     </div>
 
@@ -108,7 +133,7 @@
                     <span class="when-off">Add to my trip</span>
                     <span class="when-on">Added to my trip</span>
                 </button>
-                <button type="button" class="btn btn-light save-toggle" data-place="{{ place.place_id }}">
+                <button type="button" class="btn btn-light save-toggle {{ 'saved' if place.place_id in saved_places }}" data-place="{{ place.place_id }}">
                     <svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z"/></svg>
                     <span class="when-off">Save</span>
                     <span class="when-on">Saved</span>

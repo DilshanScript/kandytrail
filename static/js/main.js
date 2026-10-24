@@ -8,21 +8,27 @@ function updateHeader() {
 window.addEventListener("scroll", updateHeader);
 updateHeader();
 
-// saved places are kept in the browser until user accounts are added
-const saved = new Set(JSON.parse(localStorage.getItem("savedPlaces") || "[]"));
+// hide "welcome" messages after a few seconds
+document.querySelectorAll(".flash:not(.error)").forEach(message => {
+    setTimeout(() => message.classList.add("hide"), 4000);
+    message.addEventListener("transitionend", () => message.remove());
+});
+
+// save or unsave a place in the traveller's account
+const csrfToken = document.querySelector("meta[name='csrf-token']").content;
 
 document.querySelectorAll(".save-btn, .save-toggle").forEach(button => {
-    if (saved.has(button.dataset.place)) button.classList.add("saved");
-
-    button.addEventListener("click", () => {
-        const id = button.dataset.place;
-        if (saved.has(id)) {
-            saved.delete(id);
-        } else {
-            saved.add(id);
+    button.addEventListener("click", async () => {
+        const form = new FormData();
+        form.append("csrf_token", csrfToken);
+        form.append("next", location.pathname + location.search);
+        const response = await fetch(`/places/${button.dataset.place}/save`, { method: "POST", body: form });
+        const result = await response.json();
+        if (response.status === 401) {
+            location.href = result.login;  // sign in first
+            return;
         }
-        button.classList.toggle("saved");
-        localStorage.setItem("savedPlaces", JSON.stringify([...saved]));
+        button.classList.toggle("saved", result.saved);
     });
 });
 

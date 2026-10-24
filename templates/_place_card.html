@@ -3,7 +3,7 @@
         {% if place.image_file %}
             <img src="{{ url_for('static', filename='images/places/' ~ place.image_file) }}" alt="{{ place.name }}">
         {% endif %}
-        <button type="button" class="save-btn" data-place="{{ place.place_id }}" aria-label="Save place">
+        <button type="button" class="save-btn {{ 'saved' if place.place_id in saved_places }}" data-place="{{ place.place_id }}" aria-label="Save place">
             <svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z"/></svg>
         </button>
         <span class="rating">

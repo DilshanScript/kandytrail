@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Saved places - KandyTrail{% endblock %}
+
+{% block content %}
+<section class="page-head">
+    <h1>Saved places</h1>
+    <p>Places you want to visit</p>
+</section>
+
+{% set tab = "places" %}
+{% include "_saved_tabs.html" %}
+
+<section class="results">
+    {% if places %}
+        <div class="results-bar">
+            <div class="results-info">
+                <span>{{ places|length }} saved place{% if places|length != 1 %}s{% endif %}</span>
+            </div>
+        </div>
+        <div class="place-grid">
+            {% for place in places %}
+                {% include "_place_card.html" %}
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="trip-empty">
+            <p>You haven't saved any places yet. Tap the bookmark on a place to keep it here.</p>
+            <a href="{{ url_for('places') }}" class="btn btn-primary">Explore places</a>
+        </div>
+    {% endif %}
+</section>
+{% endblock %}
