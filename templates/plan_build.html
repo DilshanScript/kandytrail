@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+
+{% block title %}Choose your places - KandyTrail{% endblock %}
+
+{% block content %}
+<div class="plan-page build-page">
+    <a href="{{ url_for('plan_wizard', mode='manual') }}" class="back-link">
+        <svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
+        Change trip details
+    </a>
+
+    <h1>{{ "Choose your first stop" if not plan.stops else "Choose stop " ~ (plan.stops|length + 1) }}</h1>
+    <p class="plan-sub">From {{ here_label }} &middot; leaving at {{ now|clock }} &middot; by {{ vehicle|lower }}</p>
+
+    <div class="build-layout">
+        <div class="build-main">
+            <div class="build-map" id="buildMap" data-map="{{ build_map|tojson|forceescape }}"></div>
+
+            <div class="next-cards">
+                {% for choice in nearest %}
+                    {% set place = choice.place %}
+                    <button type="button" class="next-card" data-place="{{ place.place_id }}">
+                        <span class="next-photo">
+                            {% if place.image_file %}<img src="{{ url_for('static', filename='images/places/' ~ place.image_file) }}" alt="">{% endif %}
+                            <span class="next-letter">{{ letters[loop.index0] }}</span>
+                        </span>
+                        <span class="next-body">
+                            <strong>{{ place.name }}</strong>
+                            <span class="next-facts">
+                                <span><img src="{{ icon_url('location') }}" alt="">{{ choice.km }} km</span>
+                                <span><img src="{{ icon_url(saved.vehicle) }}" alt="">{{ "" if choice.road else "about " }}{{ choice.drive_min|duration }}</span>
+                                <span><img src="{{ icon_url('clock') }}" alt="">Arrive {{ choice.arrive|clock }}</span>
+                            </span>
+                            {% if choice.problem %}<em class="build-warn">{{ choice.problem }}</em>{% endif %}
+                        </span>
+                    </button>
+                {% endfor %}
+
+                <button type="button" class="next-card search-card" id="openSearch">
+                    <span class="search-card-icon">
+                        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+                    </span>
+                    <strong>Somewhere else?</strong>
+                    <small>Search all {{ places|length }} places by name, category or type</small>
+                    <span class="search-card-pill">
+                        Find a place
+                        <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                    </span>
+                </button>
+            </div>
+            {% if not nearest %}
+                <p class="build-empty">You've added every place. See your plan below.</p>
+            {% endif %}
+        </div>
+
+        <section class="build-trip">
+            <h2>Your trip so far</h2>
+            <div class="build-stats">
+                <span><strong>{{ plan.stops|length }}</strong> stop{% if plan.stops|length != 1 %}s{% endif %}</span>
+                <span><strong>{{ drive_min|duration }}</strong> on the road</span>
+                <span>Ends <strong>{{ plan.finish|clock }}</strong></span>
+            </div>
+            <ol class="build-timeline">
+                <li class="build-point">
+                    <span class="stop-number">S</span>
+                    <span><strong>{{ saved.start_label }}</strong><small>Leave at {{ plan.depart|clock }}</small></span>
+                </li>
+                {% for stop in plan.stops %}
+                    <li class="build-drive">{{ stop.drive_min|duration }} &middot; {{ stop.km }} km</li>
+                    <li class="build-point">
+                        <span class="stop-number">{{ loop.index }}</span>
+                        <span>
+                            <strong>{{ stop.place.name }}</strong>
+                            <small>{{ stop.start|clock }} - {{ stop.leave|clock }} &middot; {{ stop.place.stay_label or "Visit" }}, {{ stop.place.stay_min|duration }}</small>
+                            {% if stop.problem %}<em class="build-warn">{{ stop.problem }}</em>{% endif %}
+                        </span>
+                        <form method="post" action="{{ url_for('plan_edit') }}">
+                            <input type="hidden" name="back" value="build">
+                            <input type="hidden" name="index" value="{{ loop.index0 }}">
+                            <button name="action" value="remove" class="remove-btn" aria-label="Remove {{ stop.place.name }}" title="Remove">
+                                <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>
+                            </button>
+                        </form>
+                    </li>
+                {% endfor %}
+            </ol>
+
+            {% if not plan.stops %}
+                <p class="build-empty">Nothing added yet. Tap a place on the map or below it.</p>
+            {% endif %}
+            {% if plan.estimated and plan.stops %}
+                <p class="plan-note">We couldn't reach Google just now, so these drive times are rough guesses.</p>
+            {% endif %}
+
+            <div class="build-actions">
+                {% if can_undo %}
+                    <form method="post" action="{{ url_for('plan_edit') }}">
+                        <input type="hidden" name="back" value="build">
+                        <button name="action" value="undo" class="btn btn-light">Undo</button>
+                    </form>
+                {% endif %}
+                {% if plan.stops %}
+                    <a href="{{ url_for('plan_result') }}" class="btn btn-primary">
+                        Finish, see my plan
+                        <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                    </a>
+                {% endif %}
+            </div>
+        </section>
+    </div>
+
+    <!-- search every place, with category and type filters -->
+    <div class="add-sheet" id="searchSheet" hidden>
+        <div class="add-box find-box" role="dialog" aria-labelledby="findTitle">
+            <div class="add-head">
+                <div>
+                    <h2 id="findTitle">Find a place</h2>
+                    <small>Nearest to {{ here_label }} first</small>
+                </div>
+                <button type="button" class="add-close" id="searchClose" aria-label="Close">
+                    <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+                </button>
+            </div>
+            <div class="find-input">
+                <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+                <input type="text" id="placeSearch" placeholder="Search places, e.g. tea museum" autocomplete="off">
+            </div>
+            <div class="find-chips" id="findCategories">
+                <label class="find-chip"><input type="radio" name="findCategory" value="" checked><span>All</span></label>
+                {% for category in categories %}
+                    <label class="find-chip"><input type="radio" name="findCategory" value="{{ category.category_id }}"><span>{{ category.name }}</span></label>
+                {% endfor %}
+            </div>
+            {% for category in categories %}
+                {% set types = sub_types|selectattr("category_id", "equalto", category.category_id)|list %}
+                {% if types %}
+                    <div class="find-chips find-types" data-category="{{ category.category_id }}" hidden>
+                        <label class="find-chip"><input type="radio" name="findType{{ category.category_id }}" value="" checked><span>All types</span></label>
+                        {% for type in types %}
+                            <label class="find-chip"><input type="radio" name="findType{{ category.category_id }}" value="{{ type.sub_type_id }}"><span>{{ type.name }}</span></label>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endfor %}
+            <p class="find-count" id="findCount"></p>
+            <ul class="find-list" id="placeResults"></ul>
+        </div>
+    </div>
+
+    <!-- opens when a place is picked: choose how long to stay, then add it -->
+    <div class="add-sheet" id="stopSheet" hidden>
+        <div class="add-box stop-box" role="dialog" aria-labelledby="sheetName">
+            <div class="add-head">
+                <div>
+                    <h2 id="sheetName"></h2>
+                    <small id="sheetType"></small>
+                </div>
+                <button type="button" class="add-close" id="sheetClose" aria-label="Close">
+                    <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+                </button>
+            </div>
+            <div class="sheet-facts" id="sheetFacts"></div>
+            <small class="build-hours" id="sheetHours"></small>
+            <form method="post" action="{{ url_for('plan_edit') }}" class="sheet-form">
+                <input type="hidden" name="back" value="build">
+                <input type="hidden" name="action" value="add">
+                <input type="hidden" name="position" value="{{ plan.stops|length }}">
+                <input type="hidden" name="place_id" id="sheetPlace">
+                <h3>How long will you stay?</h3>
+                <div class="visit-options" id="sheetOptions"></div>
+                <p class="sheet-times" id="sheetTimes"></p>
+                <em class="build-warn" id="sheetWarn"></em>
+                <button type="submit" class="btn btn-primary">Add to my trip</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const BUILD = {{ {"places": places, "vehicleIcon": icon_url(saved.vehicle)}|tojson }};
+</script>
+<script src="{{ url_for('static', filename='js/plan_build.js') }}"></script>
+{% if maps_key %}
+<script async src="https://maps.googleapis.com/maps/api/js?key={{ maps_key }}&loading=async&callback=initBuildMap"
+        onerror="buildMapFailed()"></script>
+{% else %}
+<script>buildMapFailed();</script>
+{% endif %}
+{% endblock %}

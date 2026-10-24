@@ -1,5 +1,6 @@
 const wizard = document.getElementById("wizard");
-const steps = [...wizard.querySelectorAll(".wizard-step")];
+const allSteps = [...wizard.querySelectorAll(".wizard-step")];
+let steps = allSteps;
 const nextBtn = document.getElementById("wizardNext");
 const backBtn = document.getElementById("wizardBack");
 let current = 0;
@@ -8,6 +9,26 @@ const ICONS = JSON.parse(wizard.dataset.icons);
 const startLat = document.getElementById("startLat");
 const startLng = document.getElementById("startLng");
 const startLabel = document.getElementById("startLabel");
+
+// manual mode skips the interest and meal questions
+const isManual = () => wizard.querySelector("[name='mode']:checked")?.value === "manual";
+function updateSteps() {
+    steps = allSteps.filter(step => !(isManual() && "autoOnly" in step.dataset));
+}
+wizard.querySelectorAll("[name='mode']").forEach(input => input.addEventListener("change", () => {
+    // stay on the same question, or the one before it if this mode skips it
+    const step = steps[current];
+    updateSteps();
+    let index = steps.indexOf(step);
+    if (index === -1) {
+        const before = allSteps.slice(0, allSteps.indexOf(step)).filter(s => steps.includes(s));
+        index = Math.max(0, before.length - 1);
+        step.hidden = true;
+    }
+    current = index;
+    showStep(index);
+}));
+updateSteps();
 
 // answers needed before each step can continue
 const isDone = {
@@ -38,17 +59,21 @@ function showStep(index, back = false) {
     void step.offsetWidth;
     step.classList.add(back ? "slide-back" : "slide-in");
 
-    document.getElementById("wizardBar").style.width = `${(current + 1) / steps.length * 100}%`;
-    document.getElementById("wizardCount").textContent = `${current + 1} / ${steps.length}`;
+    updateProgress();
     backBtn.style.visibility = current === 0 ? "hidden" : "visible";
 
     const last = current === steps.length - 1;
-    nextBtn.textContent = last ? "Plan my trip" : "Continue";
+    nextBtn.textContent = !last ? "Continue" : isManual() ? "Pick my places" : "Plan my trip";
     nextBtn.classList.toggle("plan-btn", last);
     if (step.dataset.step === "review") fillReview();
     if (step.dataset.step === "meals") updateBreakfast();
     updateNext();
     window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function updateProgress() {
+    document.getElementById("wizardBar").style.width = `${(current + 1) / steps.length * 100}%`;
+    document.getElementById("wizardCount").textContent = `${current + 1} / ${steps.length}`;
 }
 
 function updateNext() {
@@ -59,6 +84,10 @@ nextBtn.addEventListener("click", () => {
     if (current < steps.length - 1) {
         showStep(current + 1);
     } else {
+        if (isManual()) {
+            document.querySelector(".planning-box strong").textContent = "Finding places near you...";
+            document.querySelector(".planning-box small").textContent = "Checking road times to the closest places";
+        }
         document.getElementById("planningOverlay").hidden = false;
         wizard.submit();
     }
@@ -246,83 +275,7 @@ document.addEventListener("click", event => {
 });
 
 // 2. calendar for dates after the first week
-const moreDays = document.getElementById("moreDays");
-const moreInput = moreDays.querySelector("input");
-const lastDay = new Date(moreDays.dataset.max + "T00:00");
-const today = new Date();
-today.setHours(0, 0, 0, 0);
-let shownMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-
-const calendar = document.createElement("div");
-calendar.className = "time-menu date-menu";
-calendar.hidden = true;
-moreDays.closest(".day-pick").appendChild(calendar);
-
-const isoDate = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-
-function drawCalendar() {
-    const year = shownMonth.getFullYear();
-    const month = shownMonth.getMonth();
-    const title = shownMonth.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
-    let cells = "";
-    const blanks = (new Date(year, month, 1).getDay() + 6) % 7;  // weeks start on Monday
-    for (let i = 0; i < blanks; i++) cells += "<span></span>";
-    for (let d = 1; d <= new Date(year, month + 1, 0).getDate(); d++) {
-        const day = new Date(year, month, d);
-        const off = day < today || day > lastDay;
-        const picked = wizard.querySelector("[name='day']:checked")?.value === isoDate(day);
-        cells += `<button type="button" data-date="${isoDate(day)}" ${off ? "disabled" : ""} class="${picked ? "active" : ""}">${d}</button>`;
-    }
-    calendar.innerHTML = `
-        <div class="date-head">
-            <button type="button" data-move="-1" ${shownMonth <= today ? "disabled" : ""} aria-label="Previous month">&lsaquo;</button>
-            <strong>${title}</strong>
-            <button type="button" data-move="1" ${new Date(year, month + 1, 1) > lastDay ? "disabled" : ""} aria-label="Next month">&rsaquo;</button>
-        </div>
-        <div class="date-grid">
-            <small>Mo</small><small>Tu</small><small>We</small><small>Th</small><small>Fr</small><small>Sa</small><small>Su</small>
-            ${cells}
-        </div>
-        <button type="button" class="btn btn-primary time-done">Done</button>`;
-}
-
-moreDays.addEventListener("click", event => {
-    event.preventDefault();
-    TimePicker.close();
-    calendar.hidden = !calendar.hidden;
-    if (!calendar.hidden) drawCalendar();
-});
-
-calendar.addEventListener("click", event => {
-    event.stopPropagation();  // the calendar redraws, so the outside-click check below can't see the button
-    const button = event.target.closest("button");
-    if (!button) return;
-    if (button.dataset.move) {
-        shownMonth.setMonth(shownMonth.getMonth() + +button.dataset.move);
-        return drawCalendar();
-    }
-    if (button.classList.contains("time-done")) return calendar.hidden = true;
-
-    // a date in the first week ticks its own chip, later dates go on the "More dates" chip
-    const chip = wizard.querySelector(`.day-chip:not(.more) input[value='${button.dataset.date}']`);
-    const day = new Date(button.dataset.date + "T00:00");
-    if (chip) {
-        chip.checked = true;
-        moreDays.querySelector("span").innerHTML = moreDays.dataset.empty;
-    } else {
-        moreInput.value = button.dataset.date;
-        moreInput.checked = true;
-        moreDays.querySelector("span").innerHTML = `<small>${day.toLocaleDateString("en-GB", { weekday: "short" })}</small>
-            <strong>${day.getDate()}</strong><small>${day.toLocaleDateString("en-GB", { month: "short" })}</small>`;
-    }
-    updateNext();
-    drawCalendar();
-});
-moreDays.dataset.empty = moreDays.querySelector("span").innerHTML;
-
-document.addEventListener("click", event => {
-    if (!calendar.hidden && !event.target.closest(".day-pick")) calendar.hidden = true;
-});
+setupDatePicker(wizard.querySelector(".day-pick"), updateNext);
 
 // 3. end time presets and a hint about the length of the day
 const endNote = document.getElementById("endNote");
@@ -383,7 +336,7 @@ function fillReview() {
     const icon = name => ICONS[name];
     const meals = checkedText("breakfast") ? [checkedText("breakfast")] : [];
     if (checkedText("lunch")) meals.push(checkedText("lunch"));
-    const rows = [
+    let rows = [
         ["start", icon("location"), "Start", startLabel.value],
         ["when", icon("calendar"), "Leaving", `${day}, ${TimePicker.niceTime(document.getElementById("startTime").value)}`],
         ["end", icon("finish"), "Finish by", TimePicker.niceTime(document.getElementById("endTime").value)],
@@ -393,6 +346,7 @@ function fillReview() {
         ["vehicle", icon(wizard.querySelector("[name='vehicle']:checked").value), "Travel by", checkedText("vehicle")],
         ["meals", icon(meals.length ? "lunch" : "skip"), "Meal stops", meals.join(" and ") || "No meal stops"]
     ];
+    rows = rows.filter(([step]) => steps.some(s => s.dataset.step === step));
     const list = document.getElementById("reviewList");
     list.innerHTML = "";
     rows.forEach(([step, icon, title, value]) => {

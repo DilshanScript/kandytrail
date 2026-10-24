@@ -4,10 +4,17 @@
 
 {% block content %}
 <div class="plan-page">
-    <a href="{{ url_for('plan_wizard') }}" class="back-link">
-        <svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
-        Plan again
-    </a>
+    {% if manual and not error %}
+        <a href="{{ url_for('plan_build') }}" class="back-link">
+            <svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
+            Pick more places
+        </a>
+    {% else %}
+        <a href="{{ url_for('plan_wizard') }}" class="back-link">
+            <svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
+            Plan again
+        </a>
+    {% endif %}
 
     {% if error %}
         <div class="plan-empty">
@@ -34,7 +41,7 @@
             <div><strong>{{ plan.finish|clock }}</strong><small>day ends</small></div>
         </div>
 
-        {% if plan.late_min > 40 %}
+        {% if plan.late_min > 40 and not manual %}
             <div class="plan-alert">
                 <img src="{{ icon_url('alert') }}" alt="">
                 <p>Your day ends {{ plan.late_min|duration }} after your {{ plan.end|clock }} end time.
@@ -52,7 +59,11 @@
 
         <div class="plan-heading">
             <h2>Step by step</h2>
-            {% if changed %}
+            <button type="button" class="text-button print-button" data-print>
+                <svg viewBox="0 0 24 24"><path d="M7 9V3h10v6M7 17H4v-7h16v7h-3"/><path d="M7 14h10v7H7z"/></svg>
+                Print
+            </button>
+            {% if changed and not manual %}
                 <form method="post" action="{{ url_for('plan_edit') }}" class="edit-only">
                     <button name="action" value="reset" class="text-button">Back to suggested plan</button>
                 </form>
@@ -182,6 +193,10 @@
                     <svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16zM14 6l4 4"/></svg>
                     Edit plan
                 </a>
+                <a href="{{ url_for('trips.save') }}" class="btn btn-light">
+                    <svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z"/></svg>
+                    Save
+                </a>
                 <a href="{{ plan.trip_links[0] if plan.trip_links|length == 1 else '#navigate' }}"
                    {% if plan.trip_links|length == 1 %}target="_blank" rel="noopener"{% endif %} class="btn btn-primary">
                     <svg viewBox="0 0 24 24"><path d="M3 11l18-8-8 18-2-8z"/></svg>
@@ -246,6 +261,7 @@
 {% if plan and plan.stops %}
 <script src="{{ url_for('static', filename='js/plan_map.js') }}"></script>
 <script src="{{ url_for('static', filename='js/plan_edit.js') }}"></script>
+<script src="{{ url_for('static', filename='js/share.js') }}"></script>
 {% if maps_key %}
 <script async src="https://maps.googleapis.com/maps/api/js?key={{ maps_key }}&loading=async&callback=initPlanMap"
         onerror="planMapFailed()"></script>

@@ -2,9 +2,20 @@ import math
 from datetime import datetime, time, timedelta
 
 from db import query_all
-from routing import RoutingError, route_line, travel_from
+from routing import VEHICLE_FACTOR, RoutingError, route_line, travel_from
 
 KANDY = (7.2931, 80.6350)          # Clock Tower, Kandy city centre
+
+# name and a short note shown on the wizard card
+VEHICLES = {
+    "car": ("Car", "Your own or a hired car"),
+    "van": ("Van", "Hired van for a group"),
+    "bike": ("Motorbike", "Scooter or motorbike"),
+    "tuktuk": ("Tuk-tuk", "Hired three-wheeler"),
+    "bus": ("Hired bus", "Private tour bus, not public transport"),
+}
+MAX_DAYS_AHEAD = 90                 # furthest day a trip can be planned for
+MANUAL_END = time(23, 59)           # manual trips have no end time, so the day runs to midnight
 BREAKFAST_BY = time(10, 30)         # breakfast only for trips leaving before this
 LUNCH_FROM, LUNCH_TO = time(11, 30), time(14, 30)
 END_GRACE = timedelta(minutes=40)   # trip may finish up to 40 min after the end time
@@ -252,6 +263,32 @@ def build_timeline(start_point, depart, vehicle, stops, end_point=KANDY):
     finish = now + timedelta(minutes=back["drive_min"]) if back else now
     return {"stops": timeline, "depart": depart, "finish": finish, "back": back,
             "lines": lines, "estimated": estimated}
+
+
+def manual_choices(here, now, vehicle, places, near=5):
+    """Places to add next in manual mode, nearest first.
+    Road times from Google for the nearest few, rough guesses for the rest."""
+    factor = VEHICLE_FACTOR.get(vehicle, 1.0)
+    places = sorted(places, key=lambda p: straight_km(here, p["point"]))
+    legs = [None] * len(places)
+    try:
+        legs[:near] = travel_from(here, [p["point"] for p in places[:near]], now, vehicle)
+    except RoutingError:
+        pass  # keep the rough guesses
+
+    choices = []
+    for place, leg in zip(places, legs):
+        if leg:
+            km, drive = leg["km"], leg["min"]
+        else:
+            km = round(straight_km(here, place["point"]) * 1.4, 1)
+            drive = max(1, round(guess_min(here, place["point"]) * factor))
+        arrive = now + timedelta(minutes=drive)
+        # closed day, long wait or already closed; the stay length is checked on the page
+        start, _, problem = stop_window(dict(place, stay_min=1), arrive)
+        choices.append({"place": place, "km": km, "drive_min": drive, "road": bool(leg),
+                        "arrive": arrive, "start": start, "problem": problem})
+    return choices
 
 
 def best_order(start_point, stops, end_point, depart):

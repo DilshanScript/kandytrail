@@ -8,6 +8,18 @@
                      'heart': icon_url('heart'), 'map': icon_url('map'), 'lunch': icon_url('lunch'), 'skip': icon_url('skip'), 'breakfast': icon_url('breakfast'),
                      'car': icon_url('car'), 'van': icon_url('van'), 'bike': icon_url('bike'),
                      'tuktuk': icon_url('tuktuk'), 'bus': icon_url('bus')}|tojson|forceescape }}">
+    <!-- plan it for me, or choose the places myself -->
+    <div class="mode-toggle" role="radiogroup" aria-label="How to plan">
+        <label>
+            <input type="radio" name="mode" value="auto" {% if mode == "auto" %}checked{% endif %}>
+            <span><strong>Plan it for me</strong></span>
+        </label>
+        <label>
+            <input type="radio" name="mode" value="manual" {% if mode == "manual" %}checked{% endif %}>
+            <span><strong>I'll choose places</strong></span>
+        </label>
+    </div>
+
     <div class="wizard-top">
         <button type="button" class="wizard-back" id="wizardBack" aria-label="Back">
             <svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
@@ -83,7 +95,7 @@
     </section>
 
     <!-- 3. end time -->
-    <section class="wizard-step" data-step="end" hidden>
+    <section class="wizard-step" data-step="end" data-auto-only hidden>
         <h1>What time do you wish to end your one-day trip?</h1>
         <p class="wizard-sub">We'll fit the places in so you reach your finish point by this time.</p>
         <div class="time-pick wizard-time">
@@ -105,7 +117,7 @@
     </section>
 
     <!-- 3b. where the day ends -->
-    <section class="wizard-step" data-step="finish" hidden>
+    <section class="wizard-step" data-step="finish" data-auto-only hidden>
         <h1>Where will your day end?</h1>
         <p class="wizard-sub">We'll plan the last places so you aren't stuck far away.</p>
         <div class="choice-grid">
@@ -137,7 +149,7 @@
     </section>
 
     <!-- 4. interests -->
-    <section class="wizard-step" data-step="interests" hidden>
+    <section class="wizard-step" data-step="interests" data-auto-only hidden>
         <h1>What do you love?</h1>
         <p class="wizard-sub">Pick one or more.</p>
         <div class="choice-grid">
@@ -194,7 +206,7 @@
     </section>
 
     <!-- 6. meals -->
-    <section class="wizard-step" data-step="meals" hidden>
+    <section class="wizard-step" data-step="meals" data-auto-only hidden>
         <h1>Should we add meal stops?</h1>
         <p class="wizard-sub">Pick one, both, or none.</p>
         <div class="choice-grid two">
@@ -240,6 +252,7 @@
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/timepicker.js') }}"></script>
+<script src="{{ url_for('static', filename='js/datepicker.js') }}"></script>
 <script src="{{ url_for('static', filename='js/wizard.js') }}"></script>
 {% if maps_key %}
 <script async src="https://maps.googleapis.com/maps/api/js?key={{ maps_key }}&loading=async&callback=initStartMap"
