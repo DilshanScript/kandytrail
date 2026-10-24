@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Contact - KandyTrail{% endblock %}
+
+{% block content %}
+<div class="info-page">
+    <section class="info-hero">
+        <h1>Contact us</h1>
+        <p>Found wrong opening hours, know a place we should add, or have a question? We'd love to hear from you.</p>
+    </section>
+
+    <div class="contact-grid">
+        {% for subject, title, text in [
+            ("Wrong place information", "Report wrong information", "Tell us the place name and what has changed, like hours or fees."),
+            ("Suggest a new place", "Suggest a place", "Know a place near Kandy worth visiting? Send us its name and where it is."),
+            ("Question about KandyTrail", "Ask a question", "Anything about planning, your account or saved trips."),
+        ] %}
+            <a href="mailto:{{ email }}?subject={{ subject|urlencode }}" class="contact-card">
+                <span class="contact-icon">
+                    {% if loop.index == 1 %}
+                        <svg viewBox="0 0 24 24"><path d="M12 8v5M12 16.5v.5"/><circle cx="12" cy="12" r="9"/></svg>
+                    {% elif loop.index == 2 %}
+                        <svg viewBox="0 0 24 24"><path d="M12 21s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12z"/><path d="M12 6v6M9 9h6"/></svg>
+                    {% else %}
+                        <svg viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 4z"/></svg>
+                    {% endif %}
+                </span>
+                <strong>{{ title }}</strong>
+                <p>{{ text }}</p>
+                <span class="contact-link">Send an email <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+            </a>
+        {% endfor %}
+    </div>
+
+    <section class="info-box contact-details">
+        <div>
+            <small>Email</small>
+            <a href="mailto:{{ email }}">{{ email }}</a>
+        </div>
+        <div>
+            <small>Based in</small>
+            <strong>Kandy, Sri Lanka</strong>
+        </div>
+    </section>
+</div>
+{% endblock %}

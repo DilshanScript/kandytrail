@@ -2,14 +2,14 @@
 
 {% block content %}
 <section class="top-grid">
-    <div class="weather-card">
+    <div class="weather-card" id="weather" data-sky="sun">
         <div class="weather-main">
-            <span class="weather-label">Weather</span>
-            <span class="weather-temp">--</span>
+            <span class="weather-label">Kandy now</span>
+            <span class="weather-temp" id="weatherTemp">--</span>
         </div>
         <div class="weather-info">
-            <span>{{ today.strftime('%A, %d %B') }}</span>
-            <span>Kandy, Sri Lanka</span>
+            <strong id="weatherText">Checking the weather...</strong>
+            <span id="weatherMore">{{ today.strftime('%a %d %b') }}</span>
         </div>
         <span class="weather-sun"></span>
     </div>
@@ -138,4 +138,5 @@
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/home.js') }}"></script>
+<script src="{{ url_for('static', filename='js/weather.js') }}"></script>
 {% endblock %}

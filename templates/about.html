@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}About - KandyTrail{% endblock %}
+
+{% block content %}
+<div class="info-page">
+    <section class="info-hero">
+        <h1>About KandyTrail</h1>
+        <p>Plan a one-day trip around Kandy in a few taps. Find temples, gardens, waterfalls, heritage sites and places to eat, then get a day plan with times and directions.</p>
+    </section>
+
+    <div class="profile-stats">
+        <a href="{{ url_for('places') }}">
+            <strong>{{ counts.places }}</strong>
+            <span>Places</span>
+        </a>
+        <a href="{{ url_for('places') }}">
+            <strong>{{ counts.categories }}</strong>
+            <span>Categories</span>
+        </a>
+        <a href="{{ url_for('trips.trip_list') }}">
+            <strong>{{ counts.trips }}</strong>
+            <span>Shared trips</span>
+        </a>
+    </div>
+
+    <section class="info-box">
+        <h2>How it works</h2>
+        <ol class="info-steps">
+            <li>
+                <span class="info-step-number">1</span>
+                <div>
+                    <strong>Explore</strong>
+                    <p>Browse places by category, search by name and see opening hours, fees, tips and a map.</p>
+                </div>
+            </li>
+            <li>
+                <span class="info-step-number">2</span>
+                <div>
+                    <strong>Plan your day</strong>
+                    <p>Answer a few questions and let KandyTrail plan it, or pick each place yourself with live distance and drive time.</p>
+                </div>
+            </li>
+            <li>
+                <span class="info-step-number">3</span>
+                <div>
+                    <strong>Go</strong>
+                    <p>Open the whole trip in Google Maps, print it, or sign in to save and share it with other travellers.</p>
+                </div>
+            </li>
+        </ol>
+    </section>
+
+    <section class="info-box">
+        <h2>What you can visit</h2>
+        <div class="info-categories">
+            {% for category in categories %}
+                <a href="{{ url_for('places', category=category.category_id) }}" class="info-category">
+                    <img src="{{ url_for('static', filename='images/categories/' ~ category.name|lower ~ '.png') }}" alt="" onerror="this.remove()">
+                    {{ category.name }}
+                </a>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="info-box info-warning">
+        <h2>Good to know</h2>
+        <p>Opening hours, entry fees and road conditions can change, and drive times are estimates. Please check with the place and the weather before you travel.</p>
+    </section>
+
+    <section class="info-box">
+        <h2>About this project</h2>
+        <p>KandyTrail was built as an individual project for ITE2953 Programming Group Project, Bachelor of Information Technology, University of Moratuwa. It uses Python Flask, MySQL, HTML, CSS and JavaScript, with Google Maps for maps and drive times and Open-Meteo for the weather.</p>
+    </section>
+</div>
+{% endblock %}
