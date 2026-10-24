@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}My account - KandyTrail{% endblock %}
+
+{% block content %}
+<div class="account-page">
+    <section class="profile-card">
+        <span class="profile-avatar">{{ user.full_name[:1]|upper }}</span>
+        <div>
+            <h1>{{ user.full_name }}</h1>
+            <p>{{ user.email }}</p>
+            <small>Member since {{ user.created_at.strftime("%B %Y") }}</small>
+        </div>
+    </section>
+
+    <div class="profile-stats">
+        <a href="{{ url_for('trips.trip_list', tab='mine') }}">
+            <strong>{{ counts.trips }}</strong>
+            <span>Saved trip{% if counts.trips != 1 %}s{% endif %}</span>
+        </a>
+        <a href="{{ url_for('saved_places') }}">
+            <strong>{{ counts.places }}</strong>
+            <span>Saved place{% if counts.places != 1 %}s{% endif %}</span>
+        </a>
+        <a href="#reviews">
+            <strong>{{ counts.reviews }}</strong>
+            <span>Review{% if counts.reviews != 1 %}s{% endif %}</span>
+        </a>
+    </div>
+
+    <div class="account-forms">
+        <form class="account-box" method="post" action="{{ url_for('accounts.update_details') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <h2>Your details</h2>
+            {% for error in errors.details %}<p class="form-error">{{ error }}</p>{% endfor %}
+            <label class="field">
+                <span>Name</span>
+                <input type="text" name="full_name" value="{{ user.full_name }}" maxlength="100" required autocomplete="name">
+            </label>
+            <label class="field">
+                <span>Email</span>
+                <input type="email" name="email" value="{{ user.email }}" maxlength="150" required autocomplete="email">
+            </label>
+            <button type="submit" class="btn btn-primary">Save details</button>
+        </form>
+
+        <form class="account-box" method="post" action="{{ url_for('accounts.change_password') }}" id="password">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <h2>Change password</h2>
+            {% for error in errors.password %}<p class="form-error">{{ error }}</p>{% endfor %}
+            <label class="field">
+                <span>Current password</span>
+                <input type="password" name="current_password" required autocomplete="current-password">
+            </label>
+            <label class="field">
+                <span>New password <small>at least 8 characters</small></span>
+                <input type="password" name="password" minlength="8" required autocomplete="new-password">
+            </label>
+            <label class="field">
+                <span>Confirm new password</span>
+                <input type="password" name="confirm_password" minlength="8" required autocomplete="new-password">
+            </label>
+            <button type="submit" class="btn btn-primary">Change password</button>
+        </form>
+    </div>
+
+    <section class="account-box" id="reviews">
+        <h2>Your reviews</h2>
+        {% if reviews %}
+            <ul class="my-reviews">
+                {% for review in reviews %}
+                    <li>
+                        <a href="{{ url_for('place_details', place_id=review.place_id) }}#reviews">
+                            <span class="find-photo">
+                                {% if review.image_file %}<img src="{{ url_for('static', filename='images/places/' ~ review.image_file) }}" alt="">{% endif %}
+                            </span>
+                            <span class="my-review-text">
+                                <strong>{{ review.name }}</strong>
+                                <span class="stars">{{ "&#9733;"|safe * review.rating }}<span class="stars-off">{{ "&#9733;"|safe * (5 - review.rating) }}</span></span>
+                                {% if review.comment %}<p>{{ review.comment }}</p>{% endif %}
+                                <small>{{ review.created_at.strftime("%d %b %Y") }}</small>
+                            </span>
+                        </a>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="muted">You haven't reviewed any places yet. Open a place and rate it to help other travellers.</p>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}
