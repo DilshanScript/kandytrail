@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token }}">
     <title>{% block title %}KandyTrail{% endblock %}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -22,32 +23,60 @@
 
             <nav class="top-nav">
                 <a href="{{ url_for('home') }}" {% if request.endpoint == 'home' %}class="active"{% endif %}>Home</a>
-                <a href="#">My trip</a>
+                <a href="{{ url_for('plan_result') }}" {% if request.endpoint and request.endpoint.startswith('plan') %}class="active"{% endif %}>My trip</a>
                 <a href="{{ url_for('places') }}" class="explore-link {% if request.endpoint == 'places' %}active{% endif %}">Explore</a>
-                <a href="#">Saved</a>
+                <a href="{{ url_for('trips.trip_list') }}" {% if request.blueprint == 'trips' or request.endpoint == 'saved_places' %}class="active"{% endif %}>Saved</a>
             </nav>
 
             <div class="top-actions">
-                <a href="#" class="btn btn-primary btn-small desktop-only">Sign in</a>
-                <a href="#" class="btn btn-light btn-small desktop-only">Sign up</a>
-                <a href="#" class="icon-btn mobile-only" aria-label="Account">
-                    <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
-                </a>
-                <button class="icon-btn mobile-only" aria-label="Menu">
-                    <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
-                </button>
+                {% if session.user_id %}
+                    <div class="dropdown account-menu">
+                        <button type="button" class="dropdown-btn" aria-haspopup="true" aria-expanded="false" aria-label="Account">
+                            <span class="avatar">{{ session.user_name[:1] | upper }}</span>
+                            <span class="account-name desktop-only">{{ session.user_name.split()[0] }}</span>
+                            <svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+                        </button>
+                        <div class="dropdown-menu">
+                            <p class="account-full-name">{{ session.user_name }}</p>
+                            <a href="{{ url_for('accounts.account') }}">My account</a>
+                            <a href="{{ url_for('trips.trip_list', tab='mine') }}">My trips</a>
+                            <a href="{{ url_for('saved_places') }}">Saved places</a>
+                            <form action="{{ url_for('accounts.logout') }}" method="post">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                <button type="submit">Sign out</button>
+                            </form>
+                        </div>
+                    </div>
+                {% else %}
+                    {# come back to this page after signing in #}
+                    {% set back = request.full_path.rstrip('?') if request.endpoint not in ('accounts.login', 'accounts.register') else request.args.next %}
+                    <a href="{{ url_for('accounts.login', next=back) }}" class="btn btn-primary btn-small desktop-only">Sign in</a>
+                    <a href="{{ url_for('accounts.register', next=back) }}" class="btn btn-light btn-small desktop-only">Sign up</a>
+                    <a href="{{ url_for('accounts.login', next=back) }}" class="icon-btn mobile-only" aria-label="Sign in">
+                        <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
+                    </a>
+                {% endif %}
             </div>
         </div>
     </header>
 
     <main class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-list">
+                    {% for category, message in messages %}
+                        <p class="flash {{ category }}">{{ message }}</p>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
         {% block content %}{% endblock %}
     </main>
 
     <footer class="footer">
         <div class="footer-links">
-            <a href="#">About</a>
-            <a href="#">Contact</a>
+            <a href="{{ url_for('about') }}">About</a>
+            <a href="{{ url_for('contact') }}">Contact</a>
             <a href="{{ url_for('admin.login') }}">Admin login</a>
         </div>
         <p class="footer-note">Opening hours and fees may change. Please check before visiting.</p>
@@ -59,7 +88,7 @@
             <svg viewBox="0 0 24 24"><path d="M3 11 12 4l9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>
             <span>Home</span>
         </a>
-        <a href="#">
+        <a href="{{ url_for('plan_result') }}" {% if request.endpoint and request.endpoint.startswith('plan') %}class="active"{% endif %}>
             <svg viewBox="0 0 24 24"><circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M8 18h8a3 3 0 0 0 0-6H8a3 3 0 0 1 0-6h8"/></svg>
             <span>My trip</span>
         </a>
@@ -67,7 +96,7 @@
             <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path class="needle" d="m15.5 8.5-2 5-5 2 2-5z"/></svg>
             <span>Explore</span>
         </a>
-        <a href="#">
+        <a href="{{ url_for('trips.trip_list') }}" {% if request.blueprint == 'trips' or request.endpoint == 'saved_places' %}class="active"{% endif %}>
             <svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z"/></svg>
             <span>Saved</span>
         </a>
