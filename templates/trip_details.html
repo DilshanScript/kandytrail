@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block title %}{{ trip.name }} - KandyTrail{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('trips.trip_list', tab='mine' if trip.mine else None) }}" class="back-link">
+    <svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
+    Trip plans
+</a>
+
+<div class="trip-page">
+    <section class="trip-info">
+        <div class="trip-title">
+            <h1>{{ trip.name }}</h1>
+            {% if not trip.is_public %}<span class="private-badge">Only me</span>{% endif %}
+        </div>
+        <div class="trip-rating" aria-label="{{ trip.rating or 0 }} out of 5">
+            {% if trip.rating %}
+                {% for n in range(1, 6) %}<span class="{{ 'on' if n <= trip.rating }}">&#9733;</span>{% endfor %}
+            {% else %}
+                <small>Not rated</small>
+            {% endif %}
+        </div>
+        <p class="trip-by">By {{ "you" if trip.mine else trip.by }} &middot; saved {{ trip.created_at.strftime("%d %b %Y") }}</p>
+
+        <dl class="trip-facts">
+            <div><dt>Start</dt><dd>{{ trip.start_label }}</dd></div>
+            <div><dt>Time</dt><dd>{% if trip.manual %}From {{ trip.start_time|short_time }}{% else %}{{ trip.start_time|short_time }} - {{ trip.end_time|short_time }}{% endif %}</dd></div>
+            <div><dt>Travel by</dt><dd>{{ trip.vehicle_name }}</dd></div>
+            <div><dt>Ends</dt><dd>{{ trip.finish_name }}</dd></div>
+        </dl>
+
+        <div class="trip-share">
+            {% if trip.is_public %}
+                {% set link = url_for('trips.details', plan_id=trip.plan_id, _external=True) %}
+                <button type="button" class="btn btn-light" data-share="{{ link }}" data-title="{{ trip.name }}" data-text="Have a look at this Kandy day trip: {{ trip.name }}">
+                    <svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/></svg>
+                    <span>Share</span>
+                </button>
+                <a href="https://wa.me/?text={{ ('Have a look at this Kandy day trip: ' ~ trip.name ~ ' ' ~ link)|urlencode }}" target="_blank" rel="noopener" class="btn btn-light">
+                    <svg viewBox="0 0 24 24"><path d="M4 20l1.3-4A8 8 0 1 1 8 18.7z"/><path d="M9 9.5c0 3 2.5 5.5 5.5 5.5l1-1.5-2-1-1 .8a4 4 0 0 1-2-2l.8-1-1-2z"/></svg>
+                    WhatsApp
+                </a>
+            {% endif %}
+            <button type="button" class="btn btn-light" data-print>
+                <svg viewBox="0 0 24 24"><path d="M7 9V3h10v6M7 17H4v-7h16v7h-3"/><path d="M7 14h10v7H7z"/></svg>
+                Print
+            </button>
+            {% if not trip.is_public and trip.mine %}
+                <p class="share-note">Only you can open this trip. To share it, tick "Let other travellers find this trip" in Edit details.</p>
+            {% endif %}
+        </div>
+
+        {% if trip.notes %}
+            <div class="trip-notes">
+                <h2>Notes</h2>
+                <p>{{ trip.notes }}</p>
+            </div>
+        {% endif %}
+
+        {% if stops %}
+            <form class="trip-use" method="post" action="{{ url_for('trips.use', plan_id=trip.plan_id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <h2>Take this trip</h2>
+                <p>Pick a day. Travel times are worked out again for that day.</p>
+                <div class="day-pick">
+                    <div class="day-chips">
+                        {% for day in days %}
+                            <label class="day-chip">
+                                <input type="radio" name="day" value="{{ day.isoformat() }}" {% if loop.first %}checked{% endif %}>
+                                <span>
+                                    <small>{{ "Today" if loop.index0 == 0 else "Tomorrow" if loop.index0 == 1 else day.strftime("%a") }}</small>
+                                    <strong>{{ day.day }}</strong>
+                                    <small>{{ day.strftime("%b") }}</small>
+                                </span>
+                            </label>
+                        {% endfor %}
+                        <!-- any later date from the calendar -->
+                        <label class="day-chip more" data-max="{{ last_day.isoformat() }}">
+                            <input type="radio" name="day" value="">
+                            <span>
+                                <small>More</small>
+                                <img src="{{ icon_url('calendar') }}" alt="">
+                                <small>dates</small>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">
+                    Use this plan
+                    <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                </button>
+            </form>
+        {% endif %}
+
+        {% if trip.mine %}
+            <div class="trip-owner">
+                <a href="{{ url_for('trips.edit', plan_id=trip.plan_id) }}" class="btn btn-light">Edit details</a>
+                <details class="delete-confirm">
+                    <summary class="btn btn-light">Delete</summary>
+                    <form method="post" action="{{ url_for('trips.delete', plan_id=trip.plan_id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <p>Delete this trip for good?</p>
+                        <button type="submit" class="btn btn-danger">Yes, delete</button>
+                    </form>
+                </details>
+            </div>
+        {% endif %}
+    </section>
+
+    <section class="trip-stops">
+        <h2>{{ stops|length }} stop{% if stops|length != 1 %}s{% endif %}</h2>
+        {% for stop in stops %}
+            <a href="{{ url_for('place_details', place_id=stop.place_id) }}" class="trip-stop">
+                <span class="stop-number">{{ loop.index }}</span>
+                <span class="trip-stop-photo">
+                    {% if stop.image_file %}<img src="{{ url_for('static', filename='images/places/' ~ stop.image_file) }}" alt="">{% endif %}
+                </span>
+                <span class="trip-stop-text">
+                    <strong>{{ stop.name }}</strong>
+                    <small>{{ stop.sub_type or stop.category }}{% if stop.stay_min %} &middot; {{ stop.stay_label }}, {{ stop.stay_min|duration }}{% endif %}</small>
+                    {% if stop.meal %}<span class="meal-tag">{{ stop.meal|title }} stop</span>{% endif %}
+                </span>
+            </a>
+        {% else %}
+            <p class="empty">The places in this trip are no longer listed.</p>
+        {% endfor %}
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/datepicker.js') }}"></script>
+<script src="{{ url_for('static', filename='js/share.js') }}"></script>
+<script>
+    const dayPick = document.querySelector(".trip-use .day-pick");
+    if (dayPick) setupDatePicker(dayPick);
+</script>
+{% endblock %}

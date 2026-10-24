@@ -1,0 +1,6 @@
+<div class="trip-tabs">
+    <a href="{{ url_for('trips.trip_list') }}" class="{{ 'active' if tab == 'all' }}">From travellers</a>
+    {% for key, label, link in [("mine", "My trips", url_for("trips.trip_list", tab="mine")), ("places", "Saved places", url_for("saved_places"))] %}
+        <a href="{{ link if session.user_id else url_for('accounts.login', next=link) }}" class="{{ 'active' if tab == key }}">{{ label }}</a>
+    {% endfor %}
+</div>
