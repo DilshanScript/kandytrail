@@ -23,6 +23,7 @@
 
             {% if session.admin_id %}
                 <div class="admin-nav">
+                    <a href="{{ url_for('admin.reviews') }}" class="admin-link">Reviews</a>
                     <a href="{{ url_for('home') }}" class="admin-link" target="_blank">View site</a>
                     <form action="{{ url_for('admin.logout') }}" method="post">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">

@@ -19,10 +19,10 @@
         <span class="stat-number">{{ stats.places }}</span>
         <span>Places</span>
     </div>
-    <div class="stat-card">
+    <a href="{{ url_for('admin.reviews') }}" class="stat-card stat-link">
         <span class="stat-number">{{ stats.reviews }}</span>
-        <span>Reviews</span>
-    </div>
+        <span>Reviews &rarr;</span>
+    </a>
     <div class="stat-card">
         <span class="stat-number">{{ stats.users }}</span>
         <span>Travellers</span>

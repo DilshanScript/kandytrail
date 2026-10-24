@@ -245,7 +245,6 @@ def login():
         user = query_one("SELECT admin_id, username, password_hash FROM admins WHERE username = %s",
                          (username,))
         if user and check_password_hash(user["password_hash"], password):
-            session.clear()
             session["admin_id"] = user["admin_id"]
             session["admin_name"] = user["username"]
             next_page = request.args.get("next", "")
@@ -260,7 +259,9 @@ def login():
 
 @admin.route("/logout", methods=["POST"])
 def logout():
-    session.clear()
+    # traveller sign-in and trip plan stay
+    session.pop("admin_id", None)
+    session.pop("admin_name", None)
     return redirect(url_for("home"))
 
 
@@ -379,3 +380,39 @@ def delete_place(place_id):
     remove_photo(place["image_file"])
     flash(f"{place['name']} was deleted.")
     return redirect(url_for("admin.dashboard"))
+
+
+@admin.route("/reviews")
+@login_required
+def reviews():
+    q = request.args.get("q", "").strip()
+    stars = request.args.get("stars", type=int)
+    where, params = [], []
+    if q:
+        like = f"%{q}%"
+        where.append("(p.name LIKE %s OR u.full_name LIKE %s OR r.comment LIKE %s)")
+        params += [like] * 3
+    if stars in range(1, 6):
+        where.append("r.rating = %s")
+        params.append(stars)
+    rows = query_all("""
+        SELECT r.review_id, r.place_id, r.rating, r.comment, r.created_at,
+               p.name AS place_name, p.image_file, u.full_name, u.email
+        FROM reviews r
+        JOIN places p ON p.place_id = r.place_id
+        JOIN users u ON u.user_id = r.user_id
+        """ + (" WHERE " + " AND ".join(where) if where else "") + """
+        ORDER BY r.created_at DESC, r.review_id DESC""", params)
+    return render_template("admin/reviews.html", reviews=rows, q=q, stars=stars)
+
+
+@admin.route("/reviews/<int:review_id>/delete", methods=["POST"])
+@login_required
+def delete_review(review_id):
+    review = query_one("""SELECT u.full_name, p.name FROM reviews r JOIN users u ON u.user_id = r.user_id
+                          JOIN places p ON p.place_id = r.place_id WHERE r.review_id = %s""", (review_id,))
+    if review is None:
+        abort(404)
+    execute("DELETE FROM reviews WHERE review_id = %s", (review_id,))
+    flash(f"{review['full_name']}'s review of {review['name']} was deleted.")
+    return redirect(request.referrer or url_for("admin.reviews"))

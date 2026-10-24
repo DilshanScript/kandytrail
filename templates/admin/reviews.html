@@ -1,0 +1,64 @@
+{% extends "admin/layout.html" %}
+
+{% block title %}Reviews{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('admin.dashboard') }}" class="back-link">
+    <svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
+    Dashboard
+</a>
+
+<div class="admin-head">
+    <div>
+        <h1>Reviews</h1>
+        <p>Check what travellers write and remove anything rude, fake or off topic.</p>
+    </div>
+</div>
+
+<form class="review-filter" method="get">
+    <div class="search-box admin-search">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+        <input type="text" name="q" value="{{ q }}" placeholder="Search place, traveller or words">
+    </div>
+    <div class="star-filter">
+        <a href="{{ url_for('admin.reviews', q=q or None) }}" class="{{ 'active' if not stars }}">All</a>
+        {% for n in range(1, 6) %}
+            <a href="{{ url_for('admin.reviews', q=q or None, stars=n) }}" class="{{ 'active' if stars == n }}">{{ n }} &#9733;</a>
+        {% endfor %}
+    </div>
+</form>
+
+<p class="review-count">{{ reviews|length }} review{% if reviews|length != 1 %}s{% endif %}</p>
+
+{% if reviews %}
+    <div class="admin-list">
+        {% for review in reviews %}
+            <div class="admin-row review-row">
+                <span class="admin-thumb">
+                    {% if review.image_file %}
+                        <img src="{{ url_for('static', filename='images/places/' ~ review.image_file) }}" alt="">
+                    {% endif %}
+                </span>
+                <div class="admin-row-text">
+                    <a href="{{ url_for('place_details', place_id=review.place_id) }}#reviews" target="_blank"><strong>{{ review.place_name }}</strong></a>
+                    <span>
+                        <span class="stars">{{ "&#9733;"|safe * review.rating }}<span class="stars-off">{{ "&#9733;"|safe * (5 - review.rating) }}</span></span>
+                        &middot; {{ review.full_name }} ({{ review.email }})
+                    </span>
+                    {% if review.comment %}<p class="review-comment">{{ review.comment }}</p>{% endif %}
+                </div>
+                <span class="admin-date">{{ review.created_at.strftime('%d %b %Y') }}</span>
+                <div class="admin-actions">
+                    <form action="{{ url_for('admin.delete_review', review_id=review.review_id) }}" method="post" class="delete-form"
+                          data-title="Delete this review?" data-text="{{ review.full_name }}'s review of {{ review.place_name }} will be removed. This can't be undone.">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <button type="submit" class="btn btn-danger btn-small">Delete</button>
+                    </form>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <p class="empty">{{ "No reviews match." if q or stars else "No reviews yet." }}</p>
+{% endif %}
+{% endblock %}

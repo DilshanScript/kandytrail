@@ -34,8 +34,8 @@ document.querySelectorAll(".delete-form").forEach(form => {
     form.addEventListener("submit", async event => {
         event.preventDefault();
         const ok = await confirmBox({
-            title: "Delete this place?",
-            text: `"${form.dataset.name}" and its reviews will be removed. This can't be undone.`,
+            title: form.dataset.title || "Delete this place?",
+            text: form.dataset.text || `"${form.dataset.name}" and its reviews will be removed. This can't be undone.`,
             yes: "Delete",
             danger: true
         });
