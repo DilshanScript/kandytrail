@@ -92,7 +92,12 @@ def visit_window(place, arrive):
 
 def next_stop(here, now, pool, vehicle, fits, end_point=None):
     closest = sorted(pool, key=lambda p: straight_km(here, p["point"]))[:CANDIDATES]
-    legs = travel_from(here, [p["point"] for p in closest], now, vehicle)
+    try:
+        legs = travel_from(here, [p["point"] for p in closest], now, vehicle)
+    except RoutingError:
+        factor = VEHICLE_FACTOR.get(vehicle, 1.0)
+        legs = [{"km": round(straight_km(here, p["point"]) * 1.4, 1),
+                 "min": round(guess_min(here, p["point"]) * factor)} for p in closest]
 
     options = []
     for leg, place in zip(legs, closest):
