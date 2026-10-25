@@ -13,7 +13,6 @@ trips = Blueprint("trips", __name__, url_prefix="/trips")
 FINISH_NAMES = {"start": "Back at the start point", "kandy": "Kandy city centre", "last": "At the last place"}
 MAX_NOTES = 1000
 
-# columns for a trip card, with stop count, place names and a cover photo
 CARD_SQL = """
     SELECT t.plan_id, t.user_id, t.name, t.start_label, t.start_latitude, t.start_longitude, t.start_time, t.end_time, t.vehicle,
            t.finish, t.rating, t.notes, t.is_public, t.created_at, u.full_name,
@@ -31,7 +30,6 @@ CARD_SQL = """
 
 @trips.before_request
 def check_csrf():
-    # same token check as the admin forms
     if request.method == "POST":
         token = session.get("csrf_token")
         if not token or request.form.get("csrf_token") != token:
@@ -40,25 +38,21 @@ def check_csrf():
 
 @trips.app_template_filter("short_time")
 def short_time(value):
-    # MySQL TIME -> "8:00 AM"
     hour, minute = map(int, time_text(value).split(":"))
     return f"{hour % 12 or 12}:{minute:02d} {'AM' if hour < 12 else 'PM'}"
 
 
 def tidy(trip):
-    """Extra fields the templates need."""
     trip["places"] = trip["place_names"].split("|") if trip["place_names"] else []
-    trip["vehicle_name"] = VEHICLES.get(trip["vehicle"], (trip["vehicle"].title(),))[0]
+    trip["vehicle_name"] = VEHICLES.get(trip["vehicle"], trip["vehicle"].title())
     trip["finish_name"] = FINISH_NAMES[trip["finish"]]
     trip["by"] = trip["full_name"].split()[0]
     trip["mine"] = trip["user_id"] == session.get("user_id")
-    # picked by hand, so there is no end time to show
     trip["manual"] = time_text(trip["end_time"]) == MANUAL_END.strftime("%H:%M")
     return trip
 
 
 def get_trip(plan_id):
-    """A trip the current traveller is allowed to see, otherwise 404."""
     trip = query_one(CARD_SQL + " WHERE t.plan_id = %s", (plan_id,))
     if not trip or not (trip["is_public"] or trip["user_id"] == session.get("user_id")):
         abort(404)
@@ -73,7 +67,6 @@ def own_trip(plan_id):
 
 
 def read_trip_form():
-    """Return (data, errors) from the save / edit form."""
     form = request.form
     data = {
         "name": form.get("name", "").strip(),
@@ -105,7 +98,6 @@ def trip_list():
     else:
         where, params = ["t.is_public = TRUE"], []
     if q:
-        # name, start point, notes or any place in the trip
         like = f"%{q}%"
         where.append("""(t.name LIKE %s OR t.start_label LIKE %s OR t.notes LIKE %s
             OR EXISTS (SELECT 1 FROM saved_plan_stops s JOIN places p ON p.place_id = s.place_id
@@ -186,7 +178,6 @@ def use(plan_id):
     start = datetime.combine(day, datetime.strptime(time_text(trip["start_time"]), "%H:%M").time())
     end = datetime.combine(day, datetime.strptime(time_text(trip["end_time"]), "%H:%M").time())
 
-    # load it like a new plan so it can be edited and saved again
     session["plan"] = {
         "start": [float(trip["start_latitude"]), float(trip["start_longitude"])],
         "start_label": trip["start_label"], "depart": start.isoformat(), "end": end.isoformat(),

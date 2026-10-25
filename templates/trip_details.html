@@ -47,7 +47,7 @@
                 Print
             </button>
             {% if not trip.is_public and trip.mine %}
-                <p class="share-note">Only you can open this trip. To share it, tick "Let other travellers find this trip" in Edit details.</p>
+                <p class="share-note">Private trip</p>
             {% endif %}
         </div>
 
@@ -62,7 +62,6 @@
             <form class="trip-use" method="post" action="{{ url_for('trips.use', plan_id=trip.plan_id) }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <h2>Take this trip</h2>
-                <p>Pick a day. Travel times are worked out again for that day.</p>
                 <div class="day-pick">
                     <div class="day-chips">
                         {% for day in days %}
@@ -75,7 +74,6 @@
                                 </span>
                             </label>
                         {% endfor %}
-                        <!-- any later date from the calendar -->
                         <label class="day-chip more" data-max="{{ last_day.isoformat() }}">
                             <input type="radio" name="day" value="">
                             <span>
@@ -86,7 +84,7 @@
                         </label>
                     </div>
                 </div>
-                <button type="submit" class="btn btn-primary">
+                <button type="submit" class="btn btn-primary"{% if session.plan %} data-confirm="Replace your current plan?" data-confirm-text="Your current plan will be replaced with this trip." data-confirm-yes="Use this plan"{% endif %}>
                     Use this plan
                     <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
                 </button>
@@ -96,14 +94,10 @@
         {% if trip.mine %}
             <div class="trip-owner">
                 <a href="{{ url_for('trips.edit', plan_id=trip.plan_id) }}" class="btn btn-light">Edit details</a>
-                <details class="delete-confirm">
-                    <summary class="btn btn-light">Delete</summary>
-                    <form method="post" action="{{ url_for('trips.delete', plan_id=trip.plan_id) }}">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                        <p>Delete this trip for good?</p>
-                        <button type="submit" class="btn btn-danger">Yes, delete</button>
-                    </form>
-                </details>
+                <form method="post" action="{{ url_for('trips.delete', plan_id=trip.plan_id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button type="submit" class="btn btn-light delete-trip" data-confirm="Delete this trip?" data-confirm-text="{{ trip.name }} will be removed. This can't be undone." data-confirm-yes="Delete" data-danger>Delete</button>
+                </form>
             </div>
         {% endif %}
     </section>

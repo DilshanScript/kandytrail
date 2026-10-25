@@ -1,4 +1,3 @@
-// time picker popup for every .time-button, the value goes into the hidden input named in data-for
 const TimePicker = (() => {
     const buttons = document.querySelectorAll(".time-button[data-for]");
 
@@ -73,7 +72,6 @@ const TimePicker = (() => {
             menu.hidden = false;
             showChoice();
 
-            // keep the popup inside the screen, phones show it as a bottom sheet
             menu.style.left = "";
             if (window.matchMedia("(min-width: 900px)").matches) {
                 const overflow = menu.getBoundingClientRect().right - (window.innerWidth - 16);

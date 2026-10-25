@@ -30,7 +30,6 @@ if (row) {
     nextBtn.addEventListener("click", () => row.scrollBy({ left: cardStep(), behavior: "smooth" }));
     row.addEventListener("scroll", updateCount);
 
-    // keep the same card in view when the window size changes
     let resizeTimer;
     window.addEventListener("resize", () => {
         const step = cardStep();
@@ -45,7 +44,6 @@ if (row) {
     updateCount();
 }
 
-// show only places from the selected category, click again to show all
 categoryButtons.forEach(button => {
     button.addEventListener("click", () => {
         const isActive = button.classList.contains("active");
@@ -57,7 +55,6 @@ categoryButtons.forEach(button => {
             card.hidden = selected !== null && !card.dataset.categories.split(" ").includes(selected);
         });
 
-        // open the places page with the same category
         document.querySelectorAll(".explore-link").forEach(link => {
             link.href = selected ? `/places?category=${selected}` : "/places";
         });
@@ -68,7 +65,6 @@ categoryButtons.forEach(button => {
     });
 });
 
-// filter panel
 const filterBtn = document.getElementById("filterBtn");
 const filterPanel = document.getElementById("filterPanel");
 const panelForm = filterPanel.querySelector("form");
@@ -81,7 +77,6 @@ function openPanel(open) {
     filterBtn.setAttribute("aria-expanded", open);
 }
 
-// show the types of the picked category and count matching places
 function updatePanel() {
     const category = panelForm.category.value;
     const typeInput = panelForm.querySelector("input[name='sub_type']:checked");

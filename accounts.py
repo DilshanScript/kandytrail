@@ -19,7 +19,6 @@ def traveller_required(view):
     def wrapper(*args, **kwargs):
         if "user_id" not in session:
             flash("Please sign in first.")
-            # after a form post, come back to the page the form was on
             back = request.full_path.rstrip("?")
             if request.method != "GET":
                 page = urlparse(request.referrer or "/")
@@ -31,7 +30,6 @@ def traveller_required(view):
 
 @accounts.before_request
 def check_csrf():
-    # same token check as the admin forms
     if request.method == "POST":
         token = session.get("csrf_token")
         if not token or request.form.get("csrf_token") != token:
@@ -39,7 +37,6 @@ def check_csrf():
 
 
 def next_page():
-    # only go back to pages on this site
     page = request.args.get("next", "")
     if not page.startswith("/") or page.startswith("//"):
         return url_for("home")
@@ -47,7 +44,6 @@ def next_page():
 
 
 def sign_in(user, remember):
-    # keep the rest of the session (trip plan, admin) as it is
     session["user_id"] = user["user_id"]
     session["user_name"] = user["full_name"]
     session.permanent = remember
@@ -109,12 +105,11 @@ def login():
 
 @accounts.route("/logout", methods=["POST"])
 def logout():
-    session.pop("user_id", None)
-    session.pop("user_name", None)
+    for key in ("user_id", "user_name", "plan", "account_errors"):
+        session.pop(key, None)
     session.permanent = False
     flash("You have signed out.")
     return redirect(url_for("home"))
-
 
 
 @accounts.route("/account")

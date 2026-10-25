@@ -1,9 +1,7 @@
-// current weather for Kandy from Open-Meteo (free, no key)
 const WEATHER_URL = "https://api.open-meteo.com/v1/forecast?latitude=7.2906&longitude=80.6337"
     + "&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max"
     + "&timezone=Asia%2FColombo&forecast_days=1";
 
-// Open-Meteo weather codes -> [text, sky]
 function weatherName(code) {
     if (code === 0) return ["Clear sky", "sun"];
     if (code <= 2) return ["Partly cloudy", "sun"];
@@ -28,15 +26,12 @@ async function loadWeather() {
         const rain = data.daily.precipitation_probability_max[0];
 
         document.getElementById("weatherTemp").textContent = `${Math.round(data.current.temperature_2m)}°`;
-        // e.g. "Partly cloudy · 40% rain", or "Rain · 80%" when it is already rainy
         if (!rain) text.textContent = name;
         else text.textContent = sky === "rain" ? `${name} · ${rain}%` : `${name} · ${rain}% rain`;
         more.textContent += ` · ${Math.round(data.daily.temperature_2m_max[0])}° / ${Math.round(data.daily.temperature_2m_min[0])}°`;
         card.dataset.sky = sky;
-        card.title = "Forecast from Open-Meteo. Check again before you travel.";
     } catch (error) {
         text.textContent = "Weather unavailable";
-        card.title = "We couldn't get the weather right now. Please try again later.";
     }
 }
 

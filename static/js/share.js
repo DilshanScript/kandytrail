@@ -1,4 +1,3 @@
-// share and print buttons
 document.querySelectorAll("[data-print]").forEach(button => {
     button.addEventListener("click", () => window.print());
 });
@@ -7,7 +6,6 @@ document.querySelectorAll("[data-share]").forEach(button => {
     const label = button.querySelector("span");
     button.addEventListener("click", async () => {
         const link = { title: button.dataset.title, text: button.dataset.text, url: button.dataset.share };
-        // phones open their own share menu, other browsers copy the link
         if (navigator.share) {
             try {
                 await navigator.share(link);

@@ -5,7 +5,6 @@ from planner import build_timeline, plan_trip
 
 categories = {c["name"]: c["category_id"] for c in query_all("SELECT category_id, name FROM categories")}
 
-# Dambulla, tomorrow 6 AM to 6 PM, by van, with breakfast and lunch, back to the start
 start = (7.8742, 80.6511)
 tomorrow = datetime.now() + timedelta(days=1)
 depart = tomorrow.replace(hour=6, minute=0, second=0, microsecond=0)
@@ -26,7 +25,6 @@ day = build_timeline(start, depart, "van", [{"place": s["place"], "meal": s["mea
 
 
 def hours(place):
-    # opening hours as saved by the admin
     if place["open_time"] is None:
         text = "open all day"
     else:

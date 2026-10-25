@@ -4,27 +4,25 @@ from datetime import datetime, time, timedelta
 from db import query_all
 from routing import VEHICLE_FACTOR, RoutingError, route_line, travel_from
 
-KANDY = (7.2931, 80.6350)          # Clock Tower, Kandy city centre
+KANDY = (7.2931, 80.6350)
 
-# name and a short note shown on the wizard card
 VEHICLES = {
-    "car": ("Car", "Your own or a hired car"),
-    "van": ("Van", "Hired van for a group"),
-    "bike": ("Motorbike", "Scooter or motorbike"),
-    "tuktuk": ("Tuk-tuk", "Hired three-wheeler"),
-    "bus": ("Hired bus", "Private tour bus, not public transport"),
+    "car": "Car",
+    "van": "Van",
+    "bike": "Motorbike",
+    "tuktuk": "Tuk-tuk",
+    "bus": "Bus",
 }
-MAX_DAYS_AHEAD = 90                 # furthest day a trip can be planned for
-MANUAL_END = time(23, 59)           # manual trips have no end time, so the day runs to midnight
-BREAKFAST_BY = time(10, 30)         # breakfast only for trips leaving before this
+MAX_DAYS_AHEAD = 90
+MANUAL_END = time(23, 59)
+BREAKFAST_BY = time(10, 30)
 LUNCH_FROM, LUNCH_TO = time(11, 30), time(14, 30)
-END_GRACE = timedelta(minutes=40)   # trip may finish up to 40 min after the end time
-MAX_WAIT = timedelta(minutes=30)    # wait at a place that is not open yet
-CANDIDATES = 5                      # closest places asked from Google each step
+END_GRACE = timedelta(minutes=40)
+MAX_WAIT = timedelta(minutes=30)
+CANDIDATES = 5
 
 
 def load_places():
-    """All places with their categories and usual visit time."""
     places = query_all("""
         SELECT p.place_id, p.name, p.latitude, p.longitude, p.image_file,
                p.open_time, p.close_time, p.closed_days, p.opening_hours,
@@ -46,7 +44,6 @@ def load_places():
 
 
 def load_options(place_ids):
-    """Ways to visit for each place, e.g. quick worship or full visit."""
     if not place_ids:
         return {}
     marks = ", ".join(["%s"] * len(place_ids))
@@ -61,7 +58,6 @@ def load_options(place_ids):
 
 
 def straight_km(a, b):
-    # haversine distance, only used to pick which places to ask Google about
     lat1, lng1, lat2, lng2 = map(math.radians, (*a, *b))
     h = (math.sin((lat2 - lat1) / 2) ** 2
          + math.cos(lat1) * math.cos(lat2) * math.sin((lng2 - lng1) / 2) ** 2)
@@ -69,17 +65,14 @@ def straight_km(a, b):
 
 
 def guess_min(a, b):
-    # rough drive time for planning ahead: roads are about 1.4x a straight line, about 30 km/h
     return straight_km(a, b) * 1.4 / 30 * 60
 
 
 def _clock(day, value):
-    # MySQL TIME comes back as a timedelta from midnight
     return datetime.combine(day, time()) + value
 
 
 def visit_window(place, arrive):
-    """Return (start, leave) for a visit, or None if the place is closed."""
     closed = place["closed_days"] or ""
     if arrive.strftime("%a") in closed:
         return None
@@ -98,7 +91,6 @@ def visit_window(place, arrive):
 
 
 def next_stop(here, now, pool, vehicle, fits, end_point=None):
-    """Best nearby place by road that is open and passes the fits() check."""
     closest = sorted(pool, key=lambda p: straight_km(here, p["point"]))[:CANDIDATES]
     legs = travel_from(here, [p["point"] for p in closest], now, vehicle)
 
@@ -109,7 +101,6 @@ def next_stop(here, now, pool, vehicle, fits, end_point=None):
         arrive = now + timedelta(minutes=leg["min"])
         window = visit_window(place, arrive)
         if window and fits(place, window[1]):
-            # going further away from the end point counts extra, so the day drifts back towards it
             away = 0
             if end_point:
                 away = max(0, guess_min(place["point"], end_point) - guess_min(here, end_point))
@@ -122,7 +113,6 @@ def next_stop(here, now, pool, vehicle, fits, end_point=None):
 
 
 def matches(place, interest_ids, sub_type_ids):
-    """True if the place fits a picked category, and its picked types if any."""
     for category in place["category_ids"] & set(interest_ids):
         picked = sub_type_ids.get(category)
         if not picked or place["sub_type_ids"] & picked:
@@ -132,13 +122,10 @@ def matches(place, interest_ids, sub_type_ids):
 
 def plan_trip(start_point, depart, end, interest_ids, vehicle="car", lunch=True, dining_id=None,
               breakfast=False, end_point=KANDY, sub_type_ids=None):
-    """Build a one-day plan that finishes at end_point (or anywhere if None) before the end time.
-    sub_type_ids: {category_id: {sub_type_id, ...}} to narrow a category down."""
     places = load_places()
     dining = [p for p in places if dining_id in p["category_ids"]]
     interests = [p for p in places if matches(p, interest_ids, sub_type_ids or {})]
     if lunch:
-        # with a lunch stop, eating places are kept for lunch only
         interests = [p for p in interests if dining_id not in p["category_ids"]]
 
     stops, visited = [], set()
@@ -146,12 +133,10 @@ def plan_trip(start_point, depart, end, interest_ids, vehicle="car", lunch=True,
     lunch_done = not lunch or not dining
 
     def back_in_time(place, leave):
-        # after this place there must still be time to reach the end point
         drive = guess_min(place["point"], end_point) if end_point else 0
         return leave + timedelta(minutes=drive) <= end + END_GRACE
 
     def before_lunch(place, leave):
-        # keep lunch late: only visit a place if a dining place can still be reached by 2:30
         if lunch_done:
             return back_in_time(place, leave)
         to_food = min(guess_min(place["point"], d["point"]) for d in dining if d["place_id"] not in visited)
@@ -163,9 +148,8 @@ def plan_trip(start_point, depart, end, interest_ids, vehicle="car", lunch=True,
 
     while True:
         if breakfast_due and now.time() > BREAKFAST_BY:
-            breakfast_due = False  # nothing was open in time
+            breakfast_due = False
         if breakfast_due:
-            # eat first, or as soon as an eating place is open
             food = [d for d in dining if d["place_id"] not in visited]
             stop = next_stop(here, now, food, vehicle, back_in_time, end_point)
             if stop:
@@ -178,24 +162,22 @@ def plan_trip(start_point, depart, end, interest_ids, vehicle="car", lunch=True,
 
         if not lunch_done and (now.time() > LUNCH_TO
                                or all(d["place_id"] in visited for d in dining)):
-            lunch_done = True  # missed the lunch window
+            lunch_done = True
 
         pool = [p for p in interests if p["place_id"] not in visited]
         stop = next_stop(here, now, pool, vehicle, before_lunch, end_point) if pool else None
         meal = None
 
         if stop is None and not lunch_done and now.time() < time(11, 0):
-            # too early to eat, so visit the nearest place anyway
             stop = next_stop(here, now, pool, vehicle, back_in_time, end_point) if pool else None
 
         if stop is None and not lunch_done:
-            # nothing else fits before lunch, so go and eat now
             food = [d for d in dining if d["place_id"] not in visited]
             stop = next_stop(here, now, food, vehicle, back_in_time, end_point)
             meal = "lunch" if stop else None
             lunch_done = True
             if stop is None:
-                continue  # no dining place fits, carry on without lunch
+                continue
 
         if stop is None:
             break
@@ -206,14 +188,13 @@ def plan_trip(start_point, depart, end, interest_ids, vehicle="car", lunch=True,
 
     notes = []
     if breakfast and not any(s["meal"] == "breakfast" for s in stops):
-        notes.append("No eating place was open early enough for breakfast before 10:30 AM.")
+        notes.append("No breakfast place open before 10:30 AM.")
     if wanted_lunch and not any(s["meal"] == "lunch" for s in stops):
-        notes.append("We couldn't fit a lunch stop between 11:30 AM and 2:30 PM.")
+        notes.append("No lunch stop between 11:30 AM and 2:30 PM.")
     return {"stops": stops, "depart": depart, "end": end, "notes": notes}
 
 
 def stop_window(place, arrive):
-    """Visit times for a stop the traveller chose, with a warning if the hours don't fit."""
     if arrive.strftime("%a") in (place["closed_days"] or ""):
         leave = arrive + timedelta(minutes=place["stay_min"])
         return arrive, leave, f"Closed on {arrive.strftime('%A')}s"
@@ -223,25 +204,23 @@ def stop_window(place, arrive):
         if arrive < opens:
             start = opens
             if opens - arrive > MAX_WAIT:
-                problem = f"Opens at {opens.strftime('%I:%M %p').lstrip('0')}, so you'll wait a while"
+                problem = f"Opens at {opens.strftime('%I:%M %p').lstrip('0')}"
     leave = start + timedelta(minutes=place["stay_min"])
     if place["close_time"] is not None:
         closes = _clock(arrive.date(), place["close_time"])
         if start >= closes:
-            problem = f"Already closed when you arrive (closes {closes.strftime('%I:%M %p').lstrip('0')})"
+            problem = f"Closed on arrival (closes {closes.strftime('%I:%M %p').lstrip('0')})"
         elif leave > closes:
             problem = f"Closes at {closes.strftime('%I:%M %p').lstrip('0')}, before your visit ends"
     return start, leave, problem
 
 
 def build_timeline(start_point, depart, vehicle, stops, end_point=KANDY):
-    """Times for stops in the given order, then to the end point if any. One Google call."""
     points = [start_point] + [stop["place"]["point"] for stop in stops] + ([end_point] if end_point else [])
     try:
         route = route_line(points, depart, vehicle)
         legs, lines, estimated = route["legs"], route["leg_lines"], False
     except RoutingError:
-        # no Google answer, use rough times so the page still works
         legs = [{"km": round(straight_km(a, b) * 1.4, 1), "min": round(guess_min(a, b))}
                 for a, b in zip(points, points[1:])]
         lines, estimated = [None] * len(legs), True
@@ -253,7 +232,7 @@ def build_timeline(start_point, depart, vehicle, stops, end_point=KANDY):
         arrive = now + timedelta(minutes=leg["min"])
         start, leave, problem = stop_window(stop["place"], arrive)
         if stop["meal"] == "lunch" and not LUNCH_FROM <= start.time() <= LUNCH_TO:
-            problem = problem or f"Lunch at {start.strftime('%I:%M %p').lstrip('0')} is outside the usual 11:30 - 2:30 time"
+            problem = problem or f"Lunch at {start.strftime('%I:%M %p').lstrip('0')}, outside 11:30 AM - 2:30 PM"
         elif stop["meal"] == "breakfast" and start.time() > time(11, 0):
             problem = problem or "Quite late for breakfast"
         timeline.append({**stop, "km": leg["km"], "drive_min": leg["min"],
@@ -266,15 +245,13 @@ def build_timeline(start_point, depart, vehicle, stops, end_point=KANDY):
 
 
 def manual_choices(here, now, vehicle, places, near=5):
-    """Places to add next in manual mode, nearest first.
-    Road times from Google for the nearest few, rough guesses for the rest."""
     factor = VEHICLE_FACTOR.get(vehicle, 1.0)
     places = sorted(places, key=lambda p: straight_km(here, p["point"]))
     legs = [None] * len(places)
     try:
         legs[:near] = travel_from(here, [p["point"] for p in places[:near]], now, vehicle)
     except RoutingError:
-        pass  # keep the rough guesses
+        pass
 
     choices = []
     for place, leg in zip(places, legs):
@@ -284,7 +261,6 @@ def manual_choices(here, now, vehicle, places, near=5):
             km = round(straight_km(here, place["point"]) * 1.4, 1)
             drive = max(1, round(guess_min(here, place["point"]) * factor))
         arrive = now + timedelta(minutes=drive)
-        # closed day, long wait or already closed; the stay length is checked on the page
         start, _, problem = stop_window(dict(place, stay_min=1), arrive)
         choices.append({"place": place, "km": km, "drive_min": drive, "road": bool(leg),
                         "arrive": arrive, "start": start, "problem": problem})
@@ -292,8 +268,6 @@ def manual_choices(here, now, vehicle, places, near=5):
 
 
 def best_order(start_point, stops, end_point, depart):
-    """Reorder stops to cut driving: nearest next, then swap pairs while it helps.
-    Breakfast stays first and lunch goes to the stop closest to 1:30 PM."""
     first = [s for s in stops if s["meal"] == "breakfast"][:1]
     lunch = [s for s in stops if s["meal"] == "lunch"][:1]
     rest = [s for s in stops if s not in first and s not in lunch]
@@ -311,7 +285,7 @@ def best_order(start_point, stops, end_point, depart):
         here = nearest["place"]["point"]
 
     improved = True
-    while improved:  # 2-opt: reverse a section if that makes the trip shorter
+    while improved:
         improved = False
         for i in range(len(order) - 1):
             for j in range(i + 1, len(order)):
@@ -320,7 +294,6 @@ def best_order(start_point, stops, end_point, depart):
                     order, improved = trial, True
 
     if lunch:
-        # try lunch in every gap and keep the one that starts nearest 1:30 PM
         target = datetime.combine(depart.date(), time(13, 30))
         def lunch_gap(i):
             timeline = first + order[:i] + lunch

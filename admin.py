@@ -13,12 +13,15 @@ from db import execute, query_all, query_one
 
 admin = Blueprint("admin", __name__, url_prefix="/admin")
 
-# Kandy city centre, used for distance_km
 KANDY_LAT, KANDY_LNG = 7.2906, 80.6337
 IMAGE_TYPES = {"jpg", "jpeg", "png", "webp"}
 TEXT_FIELDS = ["name", "short_description", "description", "keywords",
-               "entry_fee", "travel_tips", "contact"]
+               "entry_fee", "travel_tips", "contact", "transport"]
 DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+FACILITIES = ["Parking", "Toilets", "Restaurant", "Drinking water", "Wheelchair access", "Shops", "Guide service"]
+MIN_PHOTOS = 5
+MAX_PHOTOS = 12
+PHOTO_LIMIT = 5 * 1024 * 1024
 
 
 def login_required(view):
@@ -32,7 +35,6 @@ def login_required(view):
 
 @admin.before_request
 def check_csrf():
-    # every admin form sends this token so other sites can't post to us
     if request.method == "POST":
         token = session.get("csrf_token")
         if not token or request.form.get("csrf_token") != token:
@@ -47,7 +49,6 @@ def inject_csrf():
 
 
 def distance_from_kandy(lat, lng):
-    # haversine formula, result in km
     r = 6371
     d_lat = math.radians(lat - KANDY_LAT)
     d_lng = math.radians(lng - KANDY_LNG)
@@ -57,7 +58,6 @@ def distance_from_kandy(lat, lng):
 
 
 def time_text(value):
-    # MySQL TIME comes back as a timedelta, the form needs "HH:MM"
     if value is None or isinstance(value, str):
         return value
     minutes = int(value.total_seconds()) // 60
@@ -73,13 +73,11 @@ def valid_time(text):
 
 
 def nice_time(text):
-    # "17:30" -> "5:30pm"
     hour, minute = map(int, text.split(":"))
     return f"{hour % 12 or 12}:{minute:02d}{'am' if hour < 12 else 'pm'}"
 
 
 def hours_text(open_time, close_time, closed_days):
-    """Opening hours line shown to visitors, built from the times."""
     if open_time:
         text = f"{nice_time(open_time)} - {nice_time(close_time)}"
     else:
@@ -90,15 +88,15 @@ def hours_text(open_time, close_time, closed_days):
 
 
 def read_visit_options(form, errors):
-    """Ways to visit from the form, the ticked one is the default."""
     default = form.get("default_option", type=int, default=0)
     options, bad_row = [], False
     for i, (label, mins) in enumerate(zip(form.getlist("option_label"), form.getlist("option_minutes"))):
         label, mins = label.strip(), mins.strip()
+        label = label[:1].upper() + label[1:]
         if not label and not mins:
             continue
         if not label or not mins.isdigit() or not 5 <= int(mins) <= 720:
-            bad_row = True  # kept so the form shows it again
+            bad_row = True
         else:
             mins = int(mins)
         options.append({"label": label[:80], "duration_min": mins, "is_default": i == default})
@@ -113,7 +111,6 @@ def read_visit_options(form, errors):
 
 
 def read_place_form():
-    """Return (data, errors) from the submitted place form."""
     form = request.form
     data = {field: form.get(field, "").strip() or None for field in TEXT_FIELDS}
     errors = []
@@ -123,7 +120,6 @@ def read_place_form():
     if not data["short_description"]:
         errors.append("Short description is required.")
 
-    # all ticked categories, the first ticked one is the main category
     valid_categories = {row["category_id"] for row in query_all("SELECT category_id FROM categories")}
     data["category_ids"] = [c for c in form.getlist("category_ids", type=int) if c in valid_categories]
     if not data["category_ids"]:
@@ -131,18 +127,15 @@ def read_place_form():
     main = form.get("main_category_id", type=int)
     data["category_id"] = main if main in data["category_ids"] else (data["category_ids"] or [None])[0]
 
-    # keep only types that belong to the ticked categories
     types = query_all("SELECT sub_type_id, category_id FROM sub_types")
     allowed = {t["sub_type_id"]: t["category_id"] for t in types if t["category_id"] in data["category_ids"]}
     data["sub_type_ids"] = [t for t in form.getlist("sub_type_ids", type=int) if t in allowed]
     main_types = [t for t in data["sub_type_ids"] if allowed[t] == data["category_id"]]
     data["sub_type_id"] = (main_types or data["sub_type_ids"] or [None])[0]
 
-    # default way to visit also fills visit_duration_min for the place pages
     data["options"] = read_visit_options(form, errors)
     data["visit_duration_min"] = next((o["duration_min"] for o in data["options"] if o["is_default"]), None)
 
-    # opening times for the trip planner, empty means open all day
     data["open_time"] = form.get("open_time", "").strip() or None
     data["close_time"] = form.get("close_time", "").strip() or None
     if form.get("open_all_day"):
@@ -154,7 +147,7 @@ def read_place_form():
     elif data["close_time"] <= data["open_time"]:
         errors.append("Closing time must be after opening time.")
     data["closed_days"] = ",".join(d for d in DAYS if d in form.getlist("closed_days")) or None
-    # the line visitors see is made from the times
+    data["facilities"] = ",".join(f for f in FACILITIES if f in form.getlist("facilities")) or None
     if not errors:
         data["opening_hours"] = hours_text(data["open_time"], data["close_time"], data["closed_days"])
 
@@ -168,13 +161,54 @@ def read_place_form():
         if data["distance_km"] > 25:
             errors.append(f"This location is {data['distance_km']} km from Kandy. Places must be within 25 km.")
 
-    photo = request.files.get("photo")
-    if photo and photo.filename:
-        ext = photo.filename.rsplit(".", 1)[-1].lower()
-        if ext not in IMAGE_TYPES:
-            errors.append("Photo must be a JPG, PNG or WEBP image.")
+    uploads = [request.files.get("photo")] + request.files.getlist("photos")
+    for photo in uploads:
+        if photo and photo.filename:
+            ext = photo.filename.rsplit(".", 1)[-1].lower()
+            if ext not in IMAGE_TYPES:
+                errors.append(f"{photo.filename} must be a JPG, PNG or WEBP image.")
+            elif file_size(photo) > PHOTO_LIMIT:
+                errors.append(f"{photo.filename} is larger than 5 MB.")
 
     return data, errors
+
+
+def file_size(upload):
+    upload.stream.seek(0, os.SEEK_END)
+    size = upload.stream.tell()
+    upload.stream.seek(0)
+    return size
+
+
+def new_gallery_files():
+    return [photo for photo in request.files.getlist("photos") if photo and photo.filename]
+
+
+def gallery(place_id):
+    return query_all("SELECT photo_id, file_name FROM place_photos WHERE place_id = %s ORDER BY photo_id",
+                     (place_id,))
+
+
+def check_photo_count(errors, total):
+    if total < MIN_PHOTOS:
+        errors.append(f"Please add at least {MIN_PHOTOS} photos. This place has {total}.")
+    elif total > MAX_PHOTOS:
+        errors.append(f"A place can have up to {MAX_PHOTOS} photos. This place would have {total}.")
+
+
+def save_gallery(place_id, remove_ids=()):
+    for photo in gallery(place_id):
+        if photo["photo_id"] in remove_ids:
+            execute("DELETE FROM place_photos WHERE photo_id = %s", (photo["photo_id"],))
+            remove_photo(photo["file_name"])
+
+    folder = os.path.join(current_app.static_folder, "images", "places")
+    os.makedirs(folder, exist_ok=True)
+    for photo in new_gallery_files():
+        ext = photo.filename.rsplit(".", 1)[-1].lower()
+        filename = f"{place_id}-{secrets.token_hex(4)}.{ext}"
+        photo.save(os.path.join(folder, filename))
+        execute("INSERT INTO place_photos (place_id, file_name) VALUES (%s, %s)", (place_id, filename))
 
 
 def save_photo(place_id, old_file=None):
@@ -217,7 +251,6 @@ def save_visit_options(place_id, options):
 
 
 def keyword_suggestions():
-    # the most used keywords across all places
     counts = {}
     for row in query_all("SELECT keywords FROM places WHERE keywords IS NOT NULL"):
         for word in row["keywords"].split(","):
@@ -248,7 +281,6 @@ def login():
             session["admin_id"] = user["admin_id"]
             session["admin_name"] = user["username"]
             next_page = request.args.get("next", "")
-            # only follow links inside the admin area
             if not next_page.startswith("/admin"):
                 next_page = url_for("admin.dashboard")
             return redirect(next_page)
@@ -259,7 +291,6 @@ def login():
 
 @admin.route("/logout", methods=["POST"])
 def logout():
-    # traveller sign-in and trip plan stay
     session.pop("admin_id", None)
     session.pop("admin_name", None)
     return redirect(url_for("home"))
@@ -298,29 +329,33 @@ def new_place():
 
     if request.method == "POST":
         place, errors = read_place_form()
+        main = request.files.get("photo")
+        check_photo_count(errors, (1 if main and main.filename else 0) + len(new_gallery_files()))
         if not errors:
             options = place.pop("options")
             place_id = execute("""
                 INSERT INTO places (name, category_id, sub_type_id, short_description, description,
                     keywords, latitude, longitude, distance_km, opening_hours, open_time, close_time,
-                    closed_days, visit_duration_min, entry_fee, travel_tips, contact)
+                    closed_days, visit_duration_min, entry_fee, travel_tips, contact, facilities, transport)
                 VALUES (%(name)s, %(category_id)s, %(sub_type_id)s, %(short_description)s,
                     %(description)s, %(keywords)s, %(latitude)s, %(longitude)s, %(distance_km)s,
                     %(opening_hours)s, %(open_time)s, %(close_time)s, %(closed_days)s,
-                    %(visit_duration_min)s, %(entry_fee)s, %(travel_tips)s, %(contact)s)
+                    %(visit_duration_min)s, %(entry_fee)s, %(travel_tips)s, %(contact)s, %(facilities)s, %(transport)s)
             """, place)
             save_links(place_id, place)
             save_visit_options(place_id, options)
             image = save_photo(place_id)
             if image:
                 execute("UPDATE places SET image_file = %s WHERE place_id = %s", (image, place_id))
+            save_gallery(place_id)
             flash(f"{place['name']} was added.")
             return redirect(url_for("admin.dashboard"))
         for error in errors:
             flash(error, "error")
 
     return render_template("admin/place_form.html", place=place, categories=categories,
-                           sub_types=sub_types, keywords=keyword_suggestions(), editing=False)
+                           sub_types=sub_types, keywords=keyword_suggestions(), editing=False, facilities=FACILITIES,
+                           maps_key=os.getenv("GOOGLE_MAPS_KEY", ""))
 
 
 @admin.route("/places/<int:place_id>/edit", methods=["GET", "POST"])
@@ -339,11 +374,18 @@ def edit_place(place_id):
                                     WHERE place_id = %s ORDER BY option_id""", (place_id,))
     place["open_time"] = time_text(place["open_time"])
     place["close_time"] = time_text(place["close_time"])
+    place["photos"] = gallery(place_id)
 
     if request.method == "POST":
+        photos = place["photos"]
         place, errors = read_place_form()
         place["place_id"] = place_id
         place["image_file"] = current["image_file"]
+        remove_ids = {int(value) for value in request.form.getlist("remove_photo") if value.isdigit()}
+        main = request.files.get("photo")
+        has_main = bool(current["image_file"] or (main and main.filename))
+        kept = len([photo for photo in photos if photo["photo_id"] not in remove_ids])
+        check_photo_count(errors, int(has_main) + kept + len(new_gallery_files()))
         if not errors:
             options = place.pop("options")
             place["image_file"] = save_photo(place_id, current["image_file"])
@@ -356,18 +398,22 @@ def edit_place(place_id):
                     open_time = %(open_time)s, close_time = %(close_time)s,
                     closed_days = %(closed_days)s, visit_duration_min = %(visit_duration_min)s, entry_fee = %(entry_fee)s,
                     travel_tips = %(travel_tips)s, contact = %(contact)s,
+                    facilities = %(facilities)s, transport = %(transport)s,
                     image_file = %(image_file)s
                 WHERE place_id = %(place_id)s
             """, place)
             save_links(place_id, place)
             save_visit_options(place_id, options)
+            save_gallery(place_id, remove_ids)
             flash(f"{place['name']} was updated.")
             return redirect(url_for("admin.dashboard"))
+        place["photos"] = photos
         for error in errors:
             flash(error, "error")
 
     return render_template("admin/place_form.html", place=place, categories=categories,
-                           sub_types=sub_types, keywords=keyword_suggestions(), editing=True)
+                           sub_types=sub_types, keywords=keyword_suggestions(), editing=True, facilities=FACILITIES,
+                           maps_key=os.getenv("GOOGLE_MAPS_KEY", ""))
 
 
 @admin.route("/places/<int:place_id>/delete", methods=["POST"])
@@ -376,8 +422,11 @@ def delete_place(place_id):
     place = query_one("SELECT name, image_file FROM places WHERE place_id = %s", (place_id,))
     if place is None:
         abort(404)
+    photos = gallery(place_id)
     execute("DELETE FROM places WHERE place_id = %s", (place_id,))
     remove_photo(place["image_file"])
+    for photo in photos:
+        remove_photo(photo["file_name"])
     flash(f"{place['name']} was deleted.")
     return redirect(url_for("admin.dashboard"))
 

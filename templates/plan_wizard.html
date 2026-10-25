@@ -8,7 +8,6 @@
                      'heart': icon_url('heart'), 'map': icon_url('map'), 'lunch': icon_url('lunch'), 'skip': icon_url('skip'), 'breakfast': icon_url('breakfast'),
                      'car': icon_url('car'), 'van': icon_url('van'), 'bike': icon_url('bike'),
                      'tuktuk': icon_url('tuktuk'), 'bus': icon_url('bus')}|tojson|forceescape }}">
-    <!-- plan it for me, or choose the places myself -->
     <div class="mode-toggle" role="radiogroup" aria-label="How to plan">
         <label>
             <input type="radio" name="mode" value="auto" {% if mode == "auto" %}checked{% endif %}>
@@ -28,32 +27,28 @@
         <span class="wizard-count" id="wizardCount"></span>
     </div>
 
-    <!-- 1. start point -->
     <section class="wizard-step" data-step="start">
         <h1>Where will you start?</h1>
-        <p class="wizard-sub">Use your location, search a town, or tap the map.</p>
         <input type="hidden" name="start_lat" id="startLat">
         <input type="hidden" name="start_lng" id="startLng">
         <input type="hidden" name="start_label" id="startLabel">
 
         <button type="button" class="choice-card locate-btn" id="locateBtn">
             <span class="choice-icon"><img src="{{ icon_url('location') }}" alt=""></span>
-            <span><strong>Use my current location</strong><small id="locateNote">We'll ask your browser for it</small></span>
+            <span><strong>Use my current location</strong><small id="locateNote"></small></span>
         </button>
 
         <div class="place-search">
             <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
-            <input type="text" id="startSearch" placeholder="Search a town or place, e.g. Dambulla" autocomplete="off">
+            <input type="text" id="startSearch" placeholder="Search a place" autocomplete="off">
             <ul class="place-results" id="startResults" hidden></ul>
         </div>
         <div id="startMap" class="wizard-map"></div>
         <p class="picked-start" id="pickedStart" hidden></p>
     </section>
 
-    <!-- 2. date and start time -->
     <section class="wizard-step" data-step="when" hidden>
         <h1>When do you start?</h1>
-        <p class="wizard-sub">Pick the day and the time you leave.</p>
         <div class="day-pick">
         <div class="day-chips">
             {% for day in days %}
@@ -66,7 +61,6 @@
                     </span>
                 </label>
             {% endfor %}
-            <!-- any later date from the calendar -->
             <label class="day-chip more" id="moreDays" data-max="{{ last_day.isoformat() }}">
                 <input type="radio" name="day" value="">
                 <span>
@@ -94,10 +88,8 @@
         </div>
     </section>
 
-    <!-- 3. end time -->
     <section class="wizard-step" data-step="end" data-auto-only hidden>
         <h1>What time do you wish to end your one-day trip?</h1>
-        <p class="wizard-sub">We'll fit the places in so you reach your finish point by this time.</p>
         <div class="time-pick wizard-time">
             <small>Finish by</small>
             <input type="hidden" name="end_time" id="endTime" value="18:00" data-default="18:00">
@@ -116,17 +108,14 @@
         <p class="wizard-note" id="endNote"></p>
     </section>
 
-    <!-- 3b. where the day ends -->
     <section class="wizard-step" data-step="finish" data-auto-only hidden>
         <h1>Where will your day end?</h1>
-        <p class="wizard-sub">We'll plan the last places so you aren't stuck far away.</p>
         <div class="choice-grid">
             <label class="choice-card">
                 <input type="radio" name="finish" value="start" checked>
                 <span class="choice-body">
                     <span class="choice-icon"><img src="{{ icon_url('location') }}" alt=""></span>
                     <strong>Back where I started</strong>
-                    <small>Your hotel or home</small>
                 </span>
             </label>
             <label class="choice-card">
@@ -134,7 +123,7 @@
                 <span class="choice-body">
                     <span class="choice-icon"><img src="{{ icon_url('finish') }}" alt=""></span>
                     <strong>Kandy city</strong>
-                    <small>Near the Clock Tower</small>
+                    <small>Clock Tower</small>
                 </span>
             </label>
             <label class="choice-card">
@@ -142,16 +131,13 @@
                 <span class="choice-body">
                     <span class="choice-icon"><img src="{{ icon_url('map') }}" alt=""></span>
                     <strong>At the last place</strong>
-                    <small>No drive at the end</small>
                 </span>
             </label>
         </div>
     </section>
 
-    <!-- 4. interests -->
     <section class="wizard-step" data-step="interests" data-auto-only hidden>
         <h1>What do you love?</h1>
-        <p class="wizard-sub">Pick one or more.</p>
         <div class="choice-grid">
             {% for category in categories %}
                 <label class="choice-card">
@@ -166,7 +152,7 @@
             {% endfor %}
         </div>
         <div class="sub-picks" id="subPicks" hidden>
-            <h2>Want something specific? <small>Optional</small></h2>
+            <h2>Types <small>Optional</small></h2>
             {% for category in categories %}
                 {% set types = sub_types|selectattr("category_id", "equalto", category.category_id)|list %}
                 {% if types %}
@@ -183,39 +169,33 @@
                     </div>
                 {% endif %}
             {% endfor %}
-            <p class="wizard-note">Leave a group empty to include all of that kind.</p>
         </div>
     </section>
 
-    <!-- 5. vehicle -->
     <section class="wizard-step" data-step="vehicle" hidden>
         <h1>How will you travel?</h1>
-        <p class="wizard-sub">Travel times change with the vehicle.</p>
         <div class="choice-grid">
-            {% for key, (name, note) in vehicles.items() %}
+            {% for key, name in vehicles.items() %}
                 <label class="choice-card">
                     <input type="radio" name="vehicle" value="{{ key }}">
                     <span class="choice-body">
                         <span class="choice-icon"><img src="{{ icon_url(key) }}" alt=""></span>
                         <strong>{{ name }}</strong>
-                        <small>{{ note }}</small>
                     </span>
                 </label>
             {% endfor %}
         </div>
     </section>
 
-    <!-- 6. meals -->
     <section class="wizard-step" data-step="meals" data-auto-only hidden>
         <h1>Should we add meal stops?</h1>
-        <p class="wizard-sub">Pick one, both, or none.</p>
         <div class="choice-grid two">
             <label class="choice-card" id="breakfastCard">
                 <input type="checkbox" name="breakfast" value="yes">
                 <span class="choice-body">
                     <span class="choice-icon"><img src="{{ icon_url('breakfast') }}" alt=""></span>
                     <strong>Breakfast</strong>
-                    <small id="breakfastNote">First stop, once a place is open</small>
+                    <small>Before 10:30 AM</small>
                 </span>
             </label>
             <label class="choice-card">
@@ -223,16 +203,14 @@
                 <span class="choice-body">
                     <span class="choice-icon"><img src="{{ icon_url('lunch') }}" alt=""></span>
                     <strong>Lunch</strong>
-                    <small>As late as we can, by 2:30 PM</small>
+                    <small>11:30 AM - 2:30 PM</small>
                 </span>
             </label>
         </div>
     </section>
 
-    <!-- 7. check and plan -->
     <section class="wizard-step" data-step="review" hidden>
-        <h1>Ready to plan your day?</h1>
-        <p class="wizard-sub">Check your answers. Tap one to change it.</p>
+        <h1>Your trip</h1>
         <ul class="review-list" id="reviewList"></ul>
     </section>
 
@@ -244,7 +222,6 @@
         <div class="planning-box">
             <span class="planning-spinner"></span>
             <strong>Planning your day...</strong>
-            <small>Checking road times between places</small>
         </div>
     </div>
 </form>

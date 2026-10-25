@@ -10,13 +10,11 @@ const startLat = document.getElementById("startLat");
 const startLng = document.getElementById("startLng");
 const startLabel = document.getElementById("startLabel");
 
-// manual mode skips the interest and meal questions
 const isManual = () => wizard.querySelector("[name='mode']:checked")?.value === "manual";
 function updateSteps() {
     steps = allSteps.filter(step => !(isManual() && "autoOnly" in step.dataset));
 }
 wizard.querySelectorAll("[name='mode']").forEach(input => input.addEventListener("change", () => {
-    // stay on the same question, or the one before it if this mode skips it
     const step = steps[current];
     updateSteps();
     let index = steps.indexOf(step);
@@ -30,7 +28,6 @@ wizard.querySelectorAll("[name='mode']").forEach(input => input.addEventListener
 }));
 updateSteps();
 
-// answers needed before each step can continue
 const isDone = {
     start: () => startLat.value && startLng.value,
     when: () => wizard.querySelector("[name='day']:checked")?.value && document.getElementById("startTime").value,
@@ -85,8 +82,7 @@ nextBtn.addEventListener("click", () => {
         showStep(current + 1);
     } else {
         if (isManual()) {
-            document.querySelector(".planning-box strong").textContent = "Finding places near you...";
-            document.querySelector(".planning-box small").textContent = "Checking road times to the closest places";
+            document.querySelector(".planning-box strong").textContent = "Loading places...";
         }
         document.getElementById("planningOverlay").hidden = false;
         wizard.submit();
@@ -98,7 +94,6 @@ backBtn.addEventListener("click", () => {
 wizard.addEventListener("change", updateNext);
 wizard.addEventListener("input", updateNext);
 
-// 1. start point: current location, search or tap the Google map
 let startMap = null;
 let startPin = null;
 let geocoder = null;
@@ -126,12 +121,10 @@ function setStart(lat, lng, label, zoom = true) {
     updateNext();
 }
 
-// short name like "Dambulla, Matale" from a Google address
 function shortName(result) {
     return result.formatted_address.split(",").slice(0, 2).join(",").trim();
 }
 
-// called by the Google Maps script when it has loaded
 async function initStartMap() {
     startMap = new google.maps.Map(mapBox, {
         center: KANDY,
@@ -146,7 +139,6 @@ async function initStartMap() {
         const lat = event.latLng.lat();
         const lng = event.latLng.lng();
         setStart(lat, lng, "Pinned on the map", false);
-        // swap the label for the real place name when Google finds it
         geocoder.geocode({ location: { lat, lng } }).then(({ results }) => {
             if (results[0] && startLat.value === lat.toFixed(6)) setStart(lat, lng, shortName(results[0]), false);
         }).catch(() => {});
@@ -157,27 +149,26 @@ async function initStartMap() {
 }
 
 function mapFailed() {
-    mapBox.innerHTML = "<p class='map-fallback'>The map couldn't load. Please use your current location instead.</p>";
+    mapBox.innerHTML = "<p class='map-fallback'>Map unavailable</p>";
 }
-window.gm_authFailure = mapFailed;  // Google calls this when the key is wrong
+window.gm_authFailure = mapFailed;
 
 document.getElementById("locateBtn").addEventListener("click", () => {
     const note = document.getElementById("locateNote");
     if (!navigator.geolocation) {
-        note.textContent = "Your browser can't share location. Search or tap the map instead.";
+        note.textContent = "Location not available";
         return;
     }
-    note.textContent = "Finding you...";
+    note.textContent = "Locating...";
     navigator.geolocation.getCurrentPosition(
         pos => {
-            note.textContent = "Found you";
+            note.textContent = "Location found";
             setStart(pos.coords.latitude, pos.coords.longitude, "My current location");
         },
-        () => note.textContent = "Location is blocked. Search or tap the map instead."
+        () => note.textContent = "Location blocked"
     );
 });
 
-// search places in Sri Lanka with Google suggestions while typing
 const searchInput = document.getElementById("startSearch");
 const results = document.getElementById("startResults");
 let searchTimer = null;
@@ -194,7 +185,7 @@ function addResult(main, extra, pick) {
             await pick();
         } catch {
             document.getElementById("pickedStart").hidden = false;
-            document.getElementById("pickedStart").textContent = "Couldn't find that spot, please tap it on the map.";
+            document.getElementById("pickedStart").textContent = "Place not found";
         }
     });
     results.appendChild(item);
@@ -217,7 +208,6 @@ async function googleSuggestions(q) {
     });
 }
 
-// the map point of a suggestion, trying each Google service the key allows
 async function findPoint(prediction, fullText) {
     const tries = [
         async () => (await prediction.toPlace().fetchFields({ fields: ["location"] })).place.location,
@@ -265,8 +255,8 @@ searchInput.addEventListener("input", () => {
                 console.warn("Google geocoder failed", error2);
             }
         }
-        if (searchInput.value.trim() !== q) return;  // the user kept typing
-        if (!results.children.length) results.innerHTML = "<li class='empty'>No places found, try another name or tap the map</li>";
+        if (searchInput.value.trim() !== q) return;
+        if (!results.children.length) results.innerHTML = "<li class='empty'>No places found</li>";
         results.hidden = false;
     }, 300);
 });
@@ -274,20 +264,17 @@ document.addEventListener("click", event => {
     if (!event.target.closest(".place-search")) results.hidden = true;
 });
 
-// 2. calendar for dates after the first week
 setupDatePicker(wizard.querySelector(".day-pick"), updateNext);
 
-// 3. end time presets and a hint about the length of the day
 const endNote = document.getElementById("endNote");
 function updateEnd() {
     const hours = (endMinutes() - startMinutes()) / 60;
     endNote.textContent = hours >= 2
-        ? `That gives you about ${Math.floor(hours)} hours${hours % 1 ? " " + Math.round(hours % 1 * 60) + " min" : ""} to explore.`
-        : "Please give your trip at least 2 hours.";
+        ? `${Math.floor(hours)} hr${hours % 1 ? " " + Math.round(hours % 1 * 60) + " min" : ""} trip`
+        : "Minimum 2 hours";
     endNote.classList.toggle("warn", hours < 2);
 }
 
-// quick time buttons under the start and end time pickers
 const presetRows = wizard.querySelectorAll(".time-presets-row");
 function markPresets() {
     presetRows.forEach(row => row.querySelectorAll("button").forEach(b =>
@@ -303,7 +290,6 @@ document.getElementById("endTime").addEventListener("change", updateEnd);
 document.getElementById("startTime").addEventListener("change", updateEnd);
 updateEnd();
 
-// 4. show the sub-types of the picked categories
 function updateSubPicks() {
     let any = false;
     wizard.querySelectorAll(".sub-group").forEach(group => {
@@ -316,18 +302,14 @@ function updateSubPicks() {
 }
 wizard.querySelectorAll("[name='interests']").forEach(box => box.addEventListener("change", updateSubPicks));
 
-// 6. breakfast only makes sense for an early start
 function updateBreakfast() {
     const early = startMinutes() < 10 * 60 + 30;
     const box = wizard.querySelector("[name='breakfast']");
     box.disabled = !early;
     if (!early) box.checked = false;
     document.getElementById("breakfastCard").classList.toggle("off", !early);
-    document.getElementById("breakfastNote").textContent = early
-        ? "First stop, once a place is open" : "Only when you leave before 10:30 AM";
 }
 
-// 7. summary of the answers
 function fillReview() {
     const checkedText = name => [...wizard.querySelectorAll(`[name='${name}']:checked`)]
         .map(input => input.closest("label").querySelector("strong").textContent.trim()).join(", ");
@@ -358,7 +340,6 @@ function fillReview() {
     });
 }
 
-// the browser back button keeps the overlay hidden
 window.addEventListener("pageshow", () => document.getElementById("planningOverlay").hidden = true);
 
 showStep(0);

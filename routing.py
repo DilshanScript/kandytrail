@@ -10,7 +10,6 @@ ROUTES_URL = "https://routes.googleapis.com/directions/v2:computeRoutes"
 GOOGLE_KEY = os.getenv("GOOGLE_MAPS_KEY", "")
 SRI_LANKA = timezone(timedelta(hours=5, minutes=30))
 
-# Google drive times are for a car, these vehicles are slower
 VEHICLE_FACTOR = {"car": 1.0, "van": 1.0, "bike": 1.0, "tuktuk": 1.2, "bus": 1.3}
 
 
@@ -33,7 +32,6 @@ def _compute(points, depart, fields):
         "travelMode": "DRIVE",
         "routingPreference": "TRAFFIC_AWARE",
     }
-    # traffic for a future time, past times are not allowed
     if depart:
         depart = depart.replace(tzinfo=SRI_LANKA) if depart.tzinfo is None else depart
         if depart > datetime.now(SRI_LANKA):
@@ -47,17 +45,15 @@ def _compute(points, depart, fields):
         raise RoutingError(f"Google routes error {res.status_code}: {res.text[:200]}")
     routes = res.json().get("routes")
     if not routes:
-        return None  # no road found
+        return None
     return routes[0]
 
 
 def _minutes(duration, vehicle):
-    # Google sends durations like "5423s"
     return round(int(duration.rstrip("s")) / 60 * VEHICLE_FACTOR.get(vehicle, 1.0))
 
 
 def travel_from(origin, destinations, depart, vehicle="car"):
-    """Road distance and time from one point to each of the given points."""
     results = []
     for dest in destinations:
         route = _compute([origin, dest], depart, "routes.distanceMeters,routes.duration")
@@ -70,20 +66,17 @@ def travel_from(origin, destinations, depart, vehicle="car"):
 
 
 def route_line(points, depart=None, vehicle="car"):
-    """Road path through the points in order, for drawing on the map."""
     route = _compute(points, depart, "routes.polyline.encodedPolyline,routes.legs.polyline.encodedPolyline,"
                                      "routes.legs.distanceMeters,routes.legs.duration")
     if route is None:
         raise RoutingError("No road route found between these places")
     legs = [{"km": round(leg.get("distanceMeters", 0) / 1000, 1),
              "min": _minutes(leg["duration"], vehicle)} for leg in route["legs"]]
-    # one line per leg so each drive can have its own colour
     leg_lines = [_decode(leg["polyline"]["encodedPolyline"]) for leg in route["legs"]]
     return {"line": _decode(route["polyline"]["encodedPolyline"]), "legs": legs, "leg_lines": leg_lines}
 
 
 def _decode(encoded):
-    # Google encoded polyline to [[lat, lng], ...]
     points, index, lat, lng = [], 0, 0, 0
     while index < len(encoded):
         for axis in (0, 1):

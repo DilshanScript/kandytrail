@@ -11,7 +11,6 @@ MAX_COMMENT = 1000
 
 @traveller.before_request
 def check_csrf():
-    # same token check as the admin forms
     if request.method == "POST":
         token = session.get("csrf_token")
         if not token or request.form.get("csrf_token") != token:
@@ -20,7 +19,6 @@ def check_csrf():
 
 @traveller.app_context_processor
 def inject_saved_places():
-    # ids of places the signed-in traveller saved, for the bookmark buttons
     if "user_id" not in session:
         return {"saved_places": set()}
     rows = query_all("SELECT place_id FROM saved_places WHERE user_id = %s", (session["user_id"],))
@@ -37,7 +35,6 @@ def place_or_404(place_id):
 @traveller.route("/places/<int:place_id>/save", methods=["POST"])
 def toggle_save(place_id):
     if "user_id" not in session:
-        # the page sends the traveller to sign in
         return jsonify(login=url_for("accounts.login", next=request.form.get("next", "/"))), 401
     place_or_404(place_id)
     key = (session["user_id"], place_id)
@@ -60,7 +57,6 @@ def save_review(place_id):
     elif comment and len(comment) > MAX_COMMENT:
         flash(f"Reviews can be up to {MAX_COMMENT} letters.", "error")
     else:
-        # one review per traveller, writing again replaces it
         execute("""INSERT INTO reviews (user_id, place_id, rating, comment) VALUES (%s, %s, %s, %s)
                    ON DUPLICATE KEY UPDATE rating = VALUES(rating), comment = VALUES(comment),
                                            created_at = CURRENT_TIMESTAMP""",

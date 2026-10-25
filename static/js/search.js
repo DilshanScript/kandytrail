@@ -1,4 +1,3 @@
-// place suggestions while typing in a search box
 document.querySelectorAll(".search-box input[name='q']").forEach(input => {
     const box = input.closest(".search-row");
     const list = document.createElement("ul");

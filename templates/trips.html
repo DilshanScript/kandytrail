@@ -15,7 +15,7 @@
     <input type="hidden" name="sort" value="{{ sort }}">
     <div class="search-box">
         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
-        <input type="text" name="q" value="{{ q }}" placeholder="Search by trip, start point or place" autocomplete="off">
+        <input type="text" name="q" value="{{ q }}" placeholder="Search trips" autocomplete="off">
     </div>
     <button type="submit" class="filter-btn search-go" aria-label="Search">
         <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
@@ -74,7 +74,7 @@
             <a href="{{ url_for('plan_wizard') }}" class="btn btn-primary">Plan a trip</a>
         </div>
     {% else %}
-        <p class="empty">No trips found. Try another search.</p>
+        <p class="empty">No trips found.</p>
     {% endif %}
 </section>
 {% endblock %}

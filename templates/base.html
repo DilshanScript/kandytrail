@@ -43,12 +43,11 @@
                             <a href="{{ url_for('saved_places') }}">Saved places</a>
                             <form action="{{ url_for('accounts.logout') }}" method="post">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                                <button type="submit">Sign out</button>
+                                <button type="submit" data-confirm="Are you sure you want to sign out?" data-confirm-yes="Sign out">Sign out</button>
                             </form>
                         </div>
                     </div>
                 {% else %}
-                    {# come back to this page after signing in #}
                     {% set back = request.full_path.rstrip('?') if request.endpoint not in ('accounts.login', 'accounts.register') else request.args.next %}
                     <a href="{{ url_for('accounts.login', next=back) }}" class="btn btn-primary btn-small desktop-only">Sign in</a>
                     <a href="{{ url_for('accounts.register', next=back) }}" class="btn btn-light btn-small desktop-only">Sign up</a>
@@ -102,6 +101,9 @@
         </a>
     </nav>
 
+    {% include "_confirm.html" %}
+
+    <script src="{{ url_for('static', filename='js/confirm.js') }}"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     <script src="{{ url_for('static', filename='js/search.js') }}"></script>
     {% block scripts %}{% endblock %}

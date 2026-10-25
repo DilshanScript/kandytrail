@@ -1,35 +1,7 @@
-// confirm popup, returns true when the user clicks the main button
-const modal = document.getElementById("confirmModal");
+window.addEventListener("pageshow", event => {
+    if (event.persisted) window.location.reload();
+});
 
-function confirmBox({ title, text, yes = "OK", no = "Cancel", danger = false }) {
-    document.getElementById("modalTitle").textContent = title;
-    document.getElementById("modalText").textContent = text;
-    const yesBtn = document.getElementById("modalYes");
-    yesBtn.textContent = yes;
-    yesBtn.className = danger ? "btn btn-danger-solid" : "btn btn-primary";
-    document.getElementById("modalNo").textContent = no;
-    modal.classList.toggle("danger", danger);
-    modal.hidden = false;
-    yesBtn.focus();
-
-    return new Promise(resolve => {
-        function answer(event) {
-            const choice = event.target.closest("[data-answer]");
-            if (!choice && event.key !== "Escape") return;
-            modal.hidden = true;
-            modal.removeEventListener("click", answer);
-            document.removeEventListener("keydown", onKey);
-            resolve(choice ? choice.dataset.answer === "yes" : false);
-        }
-        function onKey(event) {
-            if (event.key === "Escape") answer(event);
-        }
-        modal.addEventListener("click", answer);
-        document.addEventListener("keydown", onKey);
-    });
-}
-
-// ask before deleting
 document.querySelectorAll(".delete-form").forEach(form => {
     form.addEventListener("submit", async event => {
         event.preventDefault();
@@ -43,7 +15,6 @@ document.querySelectorAll(".delete-form").forEach(form => {
     });
 });
 
-// dashboard search and category filter
 const placeSearch = document.getElementById("placeSearch");
 if (placeSearch) {
     const filterBtn = document.getElementById("adminFilterBtn");
@@ -86,7 +57,6 @@ if (placeSearch) {
     });
 }
 
-// category and type chips on the place form
 const categoryPicks = document.getElementById("categoryPicks");
 if (categoryPicks) {
     const mainInput = document.getElementById("mainCategory");
@@ -94,7 +64,6 @@ if (categoryPicks) {
     const typeOptions = document.querySelectorAll("#typePicks .option");
     const typeHint = document.getElementById("typeHint");
 
-    // the first ticked category stays the main one
     let order = categoryChecks.filter(c => c.checked).map(c => c.value);
     if (mainInput.value && order.includes(mainInput.value)) {
         order = [mainInput.value, ...order.filter(id => id !== mainInput.value)];
@@ -122,7 +91,6 @@ if (categoryPicks) {
     updateCategories();
 }
 
-// quick picks: click to fill a field
 const keywordIdeas = {
     1: ["temple", "buddhist", "worship", "dress code", "history"],
     2: ["nature", "hiking", "views", "photos", "waterfall", "bathing", "picnic"],
@@ -188,7 +156,6 @@ document.querySelectorAll("[name='keywords'], [name='entry_fee']")
 updateKeywordPicks();
 markPicks();
 
-// character counter for the short description
 document.querySelectorAll(".counter").forEach(counter => {
     const field = document.querySelector(`[name="${counter.dataset.for}"]`);
     const update = () => counter.textContent = `${field.value.length} / ${field.maxLength}`;
@@ -196,7 +163,6 @@ document.querySelectorAll(".counter").forEach(counter => {
     update();
 });
 
-// opening hours: presets and the line visitors will see
 const openAllDay = document.getElementById("openAllDay");
 if (openAllDay) {
     const openTime = document.getElementById("openTime");
@@ -243,7 +209,6 @@ if (openAllDay) {
     updateHours();
 }
 
-// ways to visit: add and remove rows
 const visitOptions = document.getElementById("visitOptions");
 if (visitOptions) {
     const addOption = document.getElementById("addOption");
@@ -282,49 +247,72 @@ if (visitOptions) {
     updateOptions();
 }
 
-// map to pick the location
 const pickMap = document.getElementById("pickMap");
-if (pickMap && window.L) {
-    const kandy = [7.2906, 80.6337];
+const KANDY = { lat: 7.2906, lng: 80.6337 };
+
+function kmBetween(a, b) {
+    const rad = Math.PI / 180;
+    const dLat = (b.lat - a.lat) * rad;
+    const dLng = (b.lng - a.lng) * rad;
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLng / 2) ** 2;
+    return 12742 * Math.asin(Math.sqrt(h));
+}
+
+function initPickMap() {
+    if (!pickMap) return;
     const latInput = document.getElementById("latInput");
     const lngInput = document.getElementById("lngInput");
     const distanceOut = document.getElementById("distanceOut");
 
-    const map = L.map(pickMap).setView(kandy, 11);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 19,
-        attribution: "&copy; OpenStreetMap contributors"
-    }).addTo(map);
-    L.circle(kandy, { radius: 25000, color: "#009AFF", weight: 1.5, fillOpacity: 0.05 }).addTo(map);
+    const map = new google.maps.Map(pickMap, {
+        center: KANDY,
+        zoom: 10,
+        disableDefaultUI: true,
+        zoomControl: true,
+        fullscreenControl: true,
+        clickableIcons: false
+    });
+    new google.maps.Circle({
+        map,
+        center: KANDY,
+        radius: 25000,
+        strokeColor: "#009AFF",
+        strokeWeight: 1.5,
+        fillColor: "#009AFF",
+        fillOpacity: 0.05,
+        clickable: false
+    });
 
-    const pin = L.divIcon({ className: "map-pin", iconSize: [26, 26], iconAnchor: [13, 26] });
     let marker = null;
 
     function setPin(lat, lng, moveMap) {
+        const point = { lat, lng };
         if (!marker) {
-            marker = L.marker([lat, lng], { icon: pin, draggable: true }).addTo(map);
-            marker.on("dragend", () => {
-                const p = marker.getLatLng();
-                setPin(p.lat, p.lng, false);
+            marker = new google.maps.Marker({ map, position: point, draggable: true });
+            marker.addListener("dragend", () => {
+                const p = marker.getPosition();
+                setPin(p.lat(), p.lng(), false);
                 latInput.dispatchEvent(new Event("input", { bubbles: true }));
             });
         }
-        marker.setLatLng([lat, lng]);
+        marker.setPosition(point);
         latInput.value = lat.toFixed(6);
         lngInput.value = lng.toFixed(6);
 
-        const km = map.distance(kandy, [lat, lng]) / 1000;
+        const km = kmBetween(KANDY, point);
         distanceOut.textContent = `${km.toFixed(1)} km`;
         distanceOut.classList.toggle("too-far", km > 25);
-        if (moveMap) map.setView([lat, lng], 14);
+        if (moveMap) {
+            map.setCenter(point);
+            map.setZoom(14);
+        }
     }
 
-    map.on("click", event => {
-        setPin(event.latlng.lat, event.latlng.lng, false);
+    map.addListener("click", event => {
+        setPin(event.latLng.lat(), event.latLng.lng(), false);
         latInput.dispatchEvent(new Event("input", { bubbles: true }));
     });
 
-    // typing the numbers also moves the pin
     [latInput, lngInput].forEach(input => input.addEventListener("change", () => {
         const lat = parseFloat(latInput.value);
         const lng = parseFloat(lngInput.value);
@@ -336,7 +324,11 @@ if (pickMap && window.L) {
     }
 }
 
-// preview the chosen photo
+function pickMapFailed() {
+    if (pickMap) pickMap.innerHTML = "<p class='map-fallback'>Map unavailable</p>";
+}
+window.gm_authFailure = pickMapFailed;
+
 const photoInput = document.getElementById("photoInput");
 if (photoInput) {
     photoInput.addEventListener("change", () => {
@@ -351,7 +343,40 @@ if (photoInput) {
     });
 }
 
-// warn before leaving the form with unsaved changes
+const photoCount = document.getElementById("photoCount");
+const galleryInput = document.getElementById("galleryInput");
+if (photoCount && galleryInput) {
+    const galleryGrid = document.getElementById("galleryGrid");
+    const addTile = galleryInput.closest(".gallery-add");
+
+    const countPhotos = () => {
+        const main = photoInput.files.length || parseInt(photoCount.dataset.main) ? 1 : 0;
+        const kept = galleryGrid.querySelectorAll(".gallery-item:not(.new) input:not(:checked)").length;
+        const total = main + kept + galleryInput.files.length;
+        photoCount.textContent = total;
+        photoCount.classList.toggle("low", total < 5);
+    };
+
+    galleryInput.addEventListener("change", () => {
+        galleryGrid.querySelectorAll(".gallery-item.new").forEach(item => item.remove());
+        [...galleryInput.files].forEach(file => {
+            const item = document.createElement("div");
+            item.className = "gallery-item new";
+            const img = document.createElement("img");
+            img.src = URL.createObjectURL(file);
+            item.appendChild(img);
+            galleryGrid.insertBefore(item, addTile);
+        });
+        countPhotos();
+    });
+
+    photoInput.addEventListener("change", countPhotos);
+    galleryGrid.addEventListener("change", event => {
+        if (event.target.name === "remove_photo") countPhotos();
+    });
+    countPhotos();
+}
+
 const placeForm = document.getElementById("placeForm");
 if (placeForm) {
     let changed = false;
@@ -377,7 +402,6 @@ if (placeForm) {
         });
     });
 
-    // browser back button, reload or closing the tab
     window.addEventListener("beforeunload", event => {
         if (changed) {
             event.preventDefault();

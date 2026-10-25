@@ -1,4 +1,3 @@
-// "More dates" chip opens a month calendar for days after the first week
 function setupDatePicker(pick, onPick) {
     const moreDays = pick.querySelector(".day-chip.more");
     const moreInput = moreDays.querySelector("input");
@@ -20,7 +19,7 @@ function setupDatePicker(pick, onPick) {
         const month = shownMonth.getMonth();
         const title = shownMonth.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
         let cells = "";
-        const blanks = (new Date(year, month, 1).getDay() + 6) % 7;  // weeks start on Monday
+        const blanks = (new Date(year, month, 1).getDay() + 6) % 7;
         for (let i = 0; i < blanks; i++) cells += "<span></span>";
         for (let d = 1; d <= new Date(year, month + 1, 0).getDate(); d++) {
             const day = new Date(year, month, d);
@@ -49,7 +48,7 @@ function setupDatePicker(pick, onPick) {
     });
 
     calendar.addEventListener("click", event => {
-        event.stopPropagation();  // the calendar redraws, so the outside-click check below can't see the button
+        event.stopPropagation();
         const button = event.target.closest("button");
         if (!button) return;
         if (button.dataset.move) {
@@ -58,7 +57,6 @@ function setupDatePicker(pick, onPick) {
         }
         if (button.classList.contains("time-done")) return calendar.hidden = true;
 
-        // a date in the first week ticks its own chip, later dates go on the "More dates" chip
         const chip = pick.querySelector(`.day-chip:not(.more) input[value='${button.dataset.date}']`);
         const day = new Date(button.dataset.date + "T00:00");
         if (chip) {
@@ -74,7 +72,6 @@ function setupDatePicker(pick, onPick) {
         draw();
     });
 
-    // picking a first-week chip clears a date shown on "More dates"
     pick.querySelectorAll(".day-chip:not(.more) input").forEach(input => {
         input.addEventListener("change", () => moreDays.querySelector("span").innerHTML = empty);
     });

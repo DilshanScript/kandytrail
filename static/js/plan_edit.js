@@ -1,7 +1,6 @@
 const planBody = document.getElementById("planBody");
 const planBar = document.getElementById("planBar");
 
-// switch edit mode on and off without reloading or losing your place on the page
 function setEditing(on) {
     planBody.classList.toggle("editing", on);
     planBar.classList.toggle("editing", on);
@@ -20,14 +19,12 @@ document.getElementById("editOff").addEventListener("click", event => {
 });
 setEditing(planBody.classList.contains("editing"));
 
-// "+ Add a stop" opens the list, sorted by distance to that gap
 const sheet = document.getElementById("addSheet");
 const gaps = JSON.parse(sheet.dataset.gaps);
 const addSearch = document.getElementById("addSearch");
 const stopNames = [...document.querySelectorAll(".plan-stop .plan-card strong")].map(el => el.textContent);
 
 function km(a, b) {
-    // straight line distance, close enough for sorting
     const rad = Math.PI / 180;
     const x = (b[1] - a[1]) * rad * Math.cos((a[0] + b[0]) / 2 * rad);
     const y = (b[0] - a[0]) * rad;
@@ -79,7 +76,6 @@ addSearch.addEventListener("input", () => {
     });
 });
 
-// show the button is working while the plan is worked out again
 document.querySelectorAll(".plan-page form").forEach(form => {
     form.addEventListener("submit", event => {
         const button = event.submitter || form.querySelector("button");

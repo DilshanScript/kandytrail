@@ -9,7 +9,6 @@ places = {
     "Kandy Lake": (7.2925, 80.6415),
 }
 
-# tomorrow 6 AM
 leave = (datetime.now() + timedelta(days=1)).replace(hour=6, minute=0, second=0, microsecond=0)
 results = travel_from(dambulla, list(places.values()), leave, "van")
 

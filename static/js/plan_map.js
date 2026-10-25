@@ -1,4 +1,3 @@
-// big map on the plan page: numbered pins and a coloured road line for each drive
 const planBox = document.getElementById("planMap");
 const plan = JSON.parse(planBox.dataset.plan);
 let planMap = null;
@@ -15,7 +14,6 @@ function pinIcon(label, color) {
     };
 }
 
-// called by the Google Maps script when it has loaded
 function initPlanMap() {
     planMap = new google.maps.Map(planBox, {
         disableDefaultUI: true,
@@ -27,7 +25,7 @@ function initPlanMap() {
             { featureType: "transit", stylers: [{ visibility: "off" }] }
         ]
     });
-    const info = new google.maps.InfoWindow();
+    const info = new google.maps.InfoWindow({ headerDisabled: true });
     const bounds = new google.maps.LatLngBounds();
 
     plan.pins.forEach((pin, i) => {
@@ -42,9 +40,18 @@ function initPlanMap() {
         marker.addListener("click", () => {
             const box = document.createElement("div");
             box.className = "map-info";
-            box.innerHTML = "<strong></strong><small></small>";
+            box.innerHTML = `<button type="button" class="map-info-close" aria-label="Close">
+                <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+                <span class="map-info-text"><strong></strong><small></small></span>`;
+            if (pin.image) {
+                const img = document.createElement("img");
+                img.src = pin.image;
+                img.alt = "";
+                box.prepend(img);
+            }
             box.querySelector("strong").textContent = `${pin.label === "S" ? "Start:" : pin.label + "."} ${pin.name}`;
             box.querySelector("small").textContent = pin.time || "";
+            box.querySelector(".map-info-close").addEventListener("click", () => info.close());
             info.setContent(box);
             info.open(planMap, marker);
         });
@@ -53,7 +60,6 @@ function initPlanMap() {
     });
 
     plan.legs.forEach((leg, i) => {
-        // straight dashed line when Google gave no road line
         const path = leg.line
             ? leg.line.map(([lat, lng]) => ({ lat, lng }))
             : [plan.pins[i], plan.pins[i + 1]].map(p => ({ lat: p.lat, lng: p.lng }));
@@ -71,11 +77,10 @@ function initPlanMap() {
 }
 
 function planMapFailed() {
-    planBox.innerHTML = "<p class='map-fallback'>The map couldn't load right now. Your plan is below.</p>";
+    planBox.innerHTML = "<p class='map-fallback'>Map unavailable</p>";
 }
-window.gm_authFailure = planMapFailed;  // Google calls this when the key is wrong
+window.gm_authFailure = planMapFailed;
 
-// tap a stop in the list to see it on the map
 document.querySelectorAll(".plan-stop").forEach(item => {
     item.addEventListener("click", event => {
         if (!planMap || event.target.closest("a, form")) return;

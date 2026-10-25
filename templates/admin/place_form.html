@@ -2,10 +2,6 @@
 
 {% block title %}{{ "Edit place" if editing else "Add place" }}{% endblock %}
 
-{% block head %}
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-{% endblock %}
 
 {% block content %}
 <a href="{{ url_for('admin.dashboard') }}" class="back-link">
@@ -31,7 +27,7 @@
         </label>
 
         <div class="field">
-            <span>Categories * <small>pick one or more, the first one is shown on place cards</small></span>
+            <span>Categories *</span>
             <input type="hidden" name="main_category_id" id="mainCategory" value="{{ place.category_id or '' }}">
             <div class="pick-group" id="categoryPicks">
                 {% for category in categories %}
@@ -57,7 +53,7 @@
                     </label>
                 {% endfor %}
             </div>
-            <p class="form-hint" id="typeHint">Pick a category first to see its types.</p>
+            <p class="form-hint" id="typeHint">Select a category</p>
         </div>
 
         <label class="field">
@@ -69,8 +65,8 @@
             <textarea name="description" rows="5">{{ place.description or '' }}</textarea>
         </label>
         <label class="field">
-            <span>Keywords <small>separate with commas, used by search</small></span>
-            <input type="text" name="keywords" value="{{ place.keywords or '' }}" maxlength="300" placeholder="e.g. waterfall, hiking, swimming, photos">
+            <span>Keywords</span>
+            <input type="text" name="keywords" value="{{ place.keywords or '' }}" maxlength="300" placeholder="waterfall, hiking, photos">
         </label>
         <div class="quick-picks" data-target="keywords" data-mode="list" id="keywordPicks" data-saved="{{ keywords|join(',') }}"></div>
     </section>
@@ -120,7 +116,7 @@
         </div>
 
         <div class="field">
-            <span>Ways to visit * <small>tick the usual one, the trip planner uses it first and visitors can switch</small></span>
+            <span>Ways to visit *</span>
             <div class="visit-options" id="visitOptions">
                 {% for option in place.options or [{"label": "Standard visit", "duration_min": "", "is_default": true}] %}
                     <div class="visit-option">
@@ -128,7 +124,7 @@
                             <input type="radio" name="default_option" value="{{ loop.index0 }}" {% if option.is_default %}checked{% endif %}>
                             <span>Usual</span>
                         </label>
-                        <input type="text" name="option_label" value="{{ option.label }}" maxlength="80" placeholder="e.g. Quick worship" aria-label="Name">
+                        <input type="text" name="option_label" value="{{ option.label }}" maxlength="80" placeholder="Quick worship" aria-label="Name">
                         <input type="number" name="option_minutes" value="{{ option.duration_min }}" min="5" max="720" step="5" placeholder="min" aria-label="Minutes">
                         <button type="button" class="remove-option" aria-label="Remove">&times;</button>
                     </div>
@@ -140,7 +136,7 @@
         <div class="field-row">
             <label class="field">
                 <span>Entry fee</span>
-                <input type="text" name="entry_fee" value="{{ place.entry_fee or '' }}" maxlength="150" placeholder="e.g. Free for locals, Rs. 2000 for foreigners">
+                <input type="text" name="entry_fee" value="{{ place.entry_fee or '' }}" maxlength="150" placeholder="Rs. 2000 for foreigners">
                 <span class="quick-picks" data-target="entry_fee">
                     <button type="button" data-value="Free">Free</button>
                     <button type="button" data-value="Free for locals, ticket for foreign visitors">Free for locals</button>
@@ -158,11 +154,26 @@
             <span>Travel tips</span>
             <textarea name="travel_tips" rows="3">{{ place.travel_tips or '' }}</textarea>
         </label>
+        <div class="field">
+            <span>Facilities</span>
+            <div class="pick-group">
+                {% for facility in facilities %}
+                    <label class="option">
+                        <input type="checkbox" name="facilities" value="{{ facility }}" {% if facility in (place.facilities or '').split(',') %}checked{% endif %}>
+                        <span>{{ facility }}</span>
+                    </label>
+                {% endfor %}
+            </div>
+        </div>
+        <label class="field">
+            <span>Getting there</span>
+            <input type="text" name="transport" value="{{ place.transport or '' }}" maxlength="300" placeholder="Bus 643 from Kandy, tuk-tuk from Peradeniya">
+        </label>
     </section>
 
     <section class="form-card">
         <h2>Location *</h2>
-        <p class="form-hint">Click the map to drop the pin, or drag it. The circle shows the 25 km limit around Kandy.</p>
+        <p class="form-hint">25 km from Kandy</p>
         <div id="pickMap"></div>
         <div class="field-row coords">
             <label class="field">
@@ -181,7 +192,8 @@
     </section>
 
     <section class="form-card">
-        <h2>Photo</h2>
+        <h2>Photos <span class="photo-count" id="photoCount" data-main="{{ 1 if place.image_file else 0 }}"></span></h2>
+        <h3 class="photo-heading">Main photo</h3>
         <label class="photo-drop">
             <input type="file" name="photo" id="photoInput" accept=".jpg,.jpeg,.png,.webp">
             <span class="photo-preview" id="photoPreview">
@@ -194,6 +206,24 @@
                 <small>JPG, PNG or WEBP, up to 5 MB</small>
             </span>
         </label>
+
+        <h3 class="photo-heading">More photos</h3>
+        <div class="gallery-grid" id="galleryGrid">
+            {% for photo in place.photos or [] %}
+                <label class="gallery-item">
+                    <img src="{{ url_for('static', filename='images/places/' ~ photo.file_name) }}" alt="">
+                    <input type="checkbox" name="remove_photo" value="{{ photo.photo_id }}">
+                    <span class="gallery-remove" title="Remove">
+                        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>
+                    </span>
+                </label>
+            {% endfor %}
+            <label class="gallery-add">
+                <input type="file" name="photos" id="galleryInput" accept=".jpg,.jpeg,.png,.webp" multiple>
+                <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+                <span>Add photos</span>
+            </label>
+        </div>
     </section>
 
     <div class="form-actions">
@@ -201,4 +231,13 @@
         <button type="submit" class="btn btn-primary">{{ "Save changes" if editing else "Add place" }}</button>
     </div>
 </form>
+{% endblock %}
+
+{% block scripts %}
+{% if maps_key %}
+<script async src="https://maps.googleapis.com/maps/api/js?key={{ maps_key }}&loading=async&callback=initPickMap"
+        onerror="pickMapFailed()"></script>
+{% else %}
+<script>pickMapFailed();</script>
+{% endif %}
 {% endblock %}

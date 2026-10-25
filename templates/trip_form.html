@@ -6,9 +6,7 @@
 <form class="login-card account-card trip-form" method="post">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <h1>{{ "Edit trip" if editing else "Save your trip" }}</h1>
-    {% if editing %}
-        <p>Change the details other travellers see.</p>
-    {% else %}
+    {% if not editing %}
         <p>{{ plan.stops|length }} stop{% if plan.stops|length != 1 %}s{% endif %}, with your order and visit times.</p>
     {% endif %}
 
@@ -16,7 +14,7 @@
 
     <label class="field">
         <span>Trip name</span>
-        <input type="text" name="name" value="{{ data.name }}" maxlength="100" required autofocus placeholder="e.g. Temples and tea in one day">
+        <input type="text" name="name" value="{{ data.name }}" maxlength="100" required autofocus placeholder="Temples and tea">
     </label>
     <label class="field">
         <span>Start point</span>
@@ -35,7 +33,7 @@
 
     <label class="field">
         <span>Notes <small>optional</small></span>
-        <textarea name="notes" rows="4" maxlength="1000" placeholder="Tips for other travellers, e.g. go early to avoid crowds">{{ data.notes or "" }}</textarea>
+        <textarea name="notes" rows="4" maxlength="1000" placeholder="Notes">{{ data.notes or "" }}</textarea>
     </label>
 
     <label class="check-row">

@@ -2,10 +2,6 @@
 
 {% block title %}{{ place.name }} - KandyTrail{% endblock %}
 
-{% block head %}
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-{% endblock %}
-
 {% block content %}
 <a href="{{ url_for('places') }}" class="back-link" id="backLink">
     <svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
@@ -14,9 +10,14 @@
 
 <div class="details">
     <div class="details-main">
-        <div class="details-photo">
-            {% if place.image_file %}
-                <img src="{{ url_for('static', filename='images/places/' ~ place.image_file) }}" alt="{{ place.name }}">
+        <div class="details-photo{% if photos|length > 1 %} collage collage-{{ [photos|length, 5]|min }}{% endif %}">
+            {% if photos %}
+                {% for photo in photos[:5] %}
+                    <button type="button" class="collage-photo" data-index="{{ loop.index0 }}">
+                        <img src="{{ url_for('static', filename='images/places/' ~ photo) }}" alt="{{ place.name }}">
+                        {% if loop.index == 5 and photos|length > 5 %}<span class="collage-more">+{{ photos|length - 5 }}</span>{% endif %}
+                    </button>
+                {% endfor %}
             {% else %}
                 <img class="photo-icon" src="{{ url_for('static', filename='images/categories/' ~ place.category|lower ~ '.png') }}" alt="" onerror="this.remove()">
             {% endif %}
@@ -59,12 +60,12 @@
                         {% endfor %}
                     </div>
                     <label class="field">
-                        <textarea name="comment" rows="3" maxlength="1000" placeholder="What did you like? Any tips for other travellers?">{{ my_review.comment or "" if my_review }}</textarea>
+                        <textarea name="comment" rows="3" maxlength="1000" placeholder="Write a review">{{ my_review.comment or "" if my_review }}</textarea>
                     </label>
                     <div class="review-actions">
                         <button type="submit" class="btn btn-primary btn-small">{{ "Update review" if my_review else "Post review" }}</button>
                         {% if my_review %}
-                            <button type="submit" class="btn btn-danger btn-small" formaction="{{ url_for('traveller.delete_review', place_id=place.place_id) }}" formnovalidate>Delete</button>
+                            <button type="submit" class="btn btn-danger btn-small" formaction="{{ url_for('traveller.delete_review', place_id=place.place_id) }}" formnovalidate data-confirm="Delete your review?" data-confirm-text="This can't be undone." data-confirm-yes="Delete" data-danger>Delete</button>
                         {% endif %}
                     </div>
                 </form>
@@ -84,7 +85,7 @@
                     <span class="review-date">{{ review.created_at.strftime('%d %b %Y') }}</span>
                 </div>
             {% else %}
-                <p class="muted">No reviews yet. Be the first to review this place.</p>
+                <p class="muted">No reviews yet.</p>
             {% endfor %}
         </section>
     </div>
@@ -118,6 +119,24 @@
                     <span>{{ place.entry_fee or "Not available" }}</span>
                 </div>
             </div>
+            {% if place.facilities %}
+                <div class="info-row">
+                    <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M10 16V8h3a2.5 2.5 0 0 1 0 5h-3"/></svg>
+                    <div>
+                        <span class="info-label">Facilities</span>
+                        <span>{{ place.facilities.replace(',', ', ') }}</span>
+                    </div>
+                </div>
+            {% endif %}
+            {% if place.transport %}
+                <div class="info-row">
+                    <svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="14" rx="3"/><path d="M5 11h14M8 17l-2 4M16 17l2 4"/><circle cx="9" cy="14" r="1"/><circle cx="15" cy="14" r="1"/></svg>
+                    <div>
+                        <span class="info-label">Getting there</span>
+                        <span>{{ place.transport }}</span>
+                    </div>
+                </div>
+            {% endif %}
             {% if place.contact %}
                 <div class="info-row">
                     <svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-3 2a11 11 0 0 0 5 5l2-3 5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg>
@@ -158,7 +177,6 @@
     <section class="section">
         <div class="section-head">
             <h2>Nearby places</h2>
-            <p>Close enough to visit on the same day</p>
         </div>
         <div class="nearby-list">
             {% for item in nearby %}
@@ -179,9 +197,33 @@
         </div>
     </section>
 {% endif %}
+
+{% if photos %}
+<div class="viewer" id="viewer" hidden>
+    <button type="button" class="viewer-close" id="viewerClose" aria-label="Close">
+        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    </button>
+    <button type="button" class="viewer-nav prev" id="viewerPrev" aria-label="Previous">
+        <svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>
+    </button>
+    <img id="viewerImage" alt="{{ place.name }}">
+    <button type="button" class="viewer-nav next" id="viewerNext" aria-label="Next">
+        <svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+    </button>
+    <span class="viewer-count" id="viewerCount"></span>
+    <script type="application/json" id="photoList">[{% for photo in photos %}{{ url_for('static', filename='images/places/' ~ photo)|tojson }}{% if not loop.last %},{% endif %}{% endfor %}]</script>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="{{ url_for('static', filename='js/details.js') }}"></script>
+{% if place.latitude is not none %}
+{% if maps_key %}
+<script async src="https://maps.googleapis.com/maps/api/js?key={{ maps_key }}&loading=async&callback=initPlaceMap"
+        onerror="placeMapFailed()"></script>
+{% else %}
+<script>placeMapFailed();</script>
+{% endif %}
+{% endif %}
 {% endblock %}

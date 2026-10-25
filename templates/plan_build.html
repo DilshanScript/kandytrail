@@ -4,7 +4,7 @@
 
 {% block content %}
 <div class="plan-page build-page">
-    <a href="{{ url_for('plan_wizard', mode='manual') }}" class="back-link">
+    <a href="{{ url_for('plan_wizard', mode='manual') }}" class="back-link"{% if plan.stops %} data-confirm="Change trip details?" data-confirm-text="The places you picked will be cleared." data-confirm-yes="Change"{% endif %}>
         <svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
         Change trip details
     </a>
@@ -41,7 +41,7 @@
                         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
                     </span>
                     <strong>Somewhere else?</strong>
-                    <small>Search all {{ places|length }} places by name, category or type</small>
+                    <small>Search all {{ places|length }} places</small>
                     <span class="search-card-pill">
                         Find a place
                         <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
@@ -49,7 +49,7 @@
                 </button>
             </div>
             {% if not nearest %}
-                <p class="build-empty">You've added every place. See your plan below.</p>
+                <p class="build-empty">All places added.</p>
             {% endif %}
         </div>
 
@@ -86,10 +86,10 @@
             </ol>
 
             {% if not plan.stops %}
-                <p class="build-empty">Nothing added yet. Tap a place on the map or below it.</p>
+                <p class="build-empty">No stops yet.</p>
             {% endif %}
             {% if plan.estimated and plan.stops %}
-                <p class="plan-note">We couldn't reach Google just now, so these drive times are rough guesses.</p>
+                <p class="plan-note">Drive times are estimated.</p>
             {% endif %}
 
             <div class="build-actions">
@@ -101,7 +101,7 @@
                 {% endif %}
                 {% if plan.stops %}
                     <a href="{{ url_for('plan_result') }}" class="btn btn-primary">
-                        Finish, see my plan
+                        See my plan
                         <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
                     </a>
                 {% endif %}
@@ -109,13 +109,12 @@
         </section>
     </div>
 
-    <!-- search every place, with category and type filters -->
     <div class="add-sheet" id="searchSheet" hidden>
         <div class="add-box find-box" role="dialog" aria-labelledby="findTitle">
             <div class="add-head">
                 <div>
                     <h2 id="findTitle">Find a place</h2>
-                    <small>Nearest to {{ here_label }} first</small>
+                    <small>Sorted by distance</small>
                 </div>
                 <button type="button" class="add-close" id="searchClose" aria-label="Close">
                     <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
@@ -123,7 +122,7 @@
             </div>
             <div class="find-input">
                 <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
-                <input type="text" id="placeSearch" placeholder="Search places, e.g. tea museum" autocomplete="off">
+                <input type="text" id="placeSearch" placeholder="Search places" autocomplete="off">
             </div>
             <div class="find-chips" id="findCategories">
                 <label class="find-chip"><input type="radio" name="findCategory" value="" checked><span>All</span></label>
@@ -147,7 +146,6 @@
         </div>
     </div>
 
-    <!-- opens when a place is picked: choose how long to stay, then add it -->
     <div class="add-sheet" id="stopSheet" hidden>
         <div class="add-box stop-box" role="dialog" aria-labelledby="sheetName">
             <div class="add-head">
@@ -167,7 +165,7 @@
                 <input type="hidden" name="position" value="{{ plan.stops|length }}">
                 <input type="hidden" name="place_id" id="sheetPlace">
                 <h3>How long will you stay?</h3>
-                <div class="visit-options" id="sheetOptions"></div>
+                <div class="stay-options" id="sheetOptions"></div>
                 <p class="sheet-times" id="sheetTimes"></p>
                 <em class="build-warn" id="sheetWarn"></em>
                 <button type="submit" class="btn btn-primary">Add to my trip</button>
