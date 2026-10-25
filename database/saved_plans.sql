@@ -1,6 +1,5 @@
 USE kandytrail;
 
--- trips saved by travellers
 CREATE TABLE saved_plans (
     plan_id         INT AUTO_INCREMENT PRIMARY KEY,
     user_id         INT NOT NULL,
@@ -20,7 +19,6 @@ CREATE TABLE saved_plans (
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 
--- places in a saved trip, in visiting order
 CREATE TABLE saved_plan_stops (
     plan_id   INT NOT NULL,
     position  TINYINT NOT NULL,

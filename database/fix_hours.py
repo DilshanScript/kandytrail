@@ -1,11 +1,8 @@
-"""Fill open_time / close_time from the old opening_hours text.
-Run: python database/fix_hours.py          (shows what will change)
-     python database/fix_hours.py --save   (saves it)"""
 import re
 import sys
 
 sys.path.insert(0, ".")
-from db import execute, query_all  # noqa: E402
+from db import execute, query_all
 
 TIME = r"(\d{1,2})(?:[:.](\d{2}))?\s*(am|pm)"
 DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]

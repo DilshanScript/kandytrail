@@ -1,16 +1,13 @@
--- KandyTrail database schema
 
 DROP DATABASE IF EXISTS kandytrail;
 CREATE DATABASE kandytrail CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE kandytrail;
 
--- categories
 CREATE TABLE categories (
     category_id INT AUTO_INCREMENT PRIMARY KEY,
     name        VARCHAR(50) NOT NULL UNIQUE
 );
 
--- sub_types
 CREATE TABLE sub_types (
     sub_type_id INT AUTO_INCREMENT PRIMARY KEY,
     category_id INT NOT NULL,
@@ -19,7 +16,6 @@ CREATE TABLE sub_types (
     FOREIGN KEY (category_id) REFERENCES categories(category_id)
 );
 
--- places
 CREATE TABLE places (
     place_id           INT AUTO_INCREMENT PRIMARY KEY,
     name               VARCHAR(150) NOT NULL,
@@ -44,7 +40,6 @@ CREATE TABLE places (
     FOREIGN KEY (sub_type_id) REFERENCES sub_types(sub_type_id)
 );
 
--- place_categories (a place can have more than one category)
 CREATE TABLE place_categories (
     place_id    INT NOT NULL,
     category_id INT NOT NULL,
@@ -53,7 +48,6 @@ CREATE TABLE place_categories (
     FOREIGN KEY (category_id) REFERENCES categories(category_id)
 );
 
--- place_sub_types
 CREATE TABLE place_sub_types (
     place_id    INT NOT NULL,
     sub_type_id INT NOT NULL,
@@ -62,7 +56,6 @@ CREATE TABLE place_sub_types (
     FOREIGN KEY (sub_type_id) REFERENCES sub_types(sub_type_id)
 );
 
--- admins
 CREATE TABLE admins (
     admin_id      INT AUTO_INCREMENT PRIMARY KEY,
     username      VARCHAR(50) NOT NULL UNIQUE,
@@ -70,7 +63,6 @@ CREATE TABLE admins (
     created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- users
 CREATE TABLE users (
     user_id       INT AUTO_INCREMENT PRIMARY KEY,
     full_name     VARCHAR(100) NOT NULL,
@@ -79,7 +71,6 @@ CREATE TABLE users (
     created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- reviews
 CREATE TABLE reviews (
     review_id  INT AUTO_INCREMENT PRIMARY KEY,
     user_id    INT NOT NULL,
@@ -92,7 +83,6 @@ CREATE TABLE reviews (
     FOREIGN KEY (place_id) REFERENCES places(place_id) ON DELETE CASCADE
 );
 
--- saved_preferences
 CREATE TABLE saved_preferences (
     preference_id  INT AUTO_INCREMENT PRIMARY KEY,
     user_id        INT NOT NULL UNIQUE,
@@ -108,7 +98,6 @@ CREATE TABLE saved_preferences (
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 
--- Default data
 
 INSERT INTO categories (name) VALUES
 ('Religious'), ('Nature'), ('Heritage'), ('Cultural'), ('Dining');
@@ -120,7 +109,6 @@ INSERT INTO sub_types (category_id, name) VALUES
 (4, 'Cultural show'),
 (5, 'Cafe'), (5, 'Bakery'), (5, 'Local restaurant'), (5, 'Hotel restaurant');
 
--- Sample places
 INSERT INTO places
 (name, category_id, sub_type_id, short_description, latitude, longitude, distance_km,
  opening_hours, visit_duration_min, price_level, entry_fee, travel_tips, keywords)

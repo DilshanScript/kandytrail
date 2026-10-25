@@ -1,6 +1,5 @@
 USE kandytrail;
 
--- places a traveller saved to visit later
 CREATE TABLE saved_places (
     user_id  INT NOT NULL,
     place_id INT NOT NULL,

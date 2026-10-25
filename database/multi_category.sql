@@ -1,6 +1,5 @@
 USE kandytrail;
 
--- a place can belong to more than one category and type
 CREATE TABLE place_categories (
     place_id    INT NOT NULL,
     category_id INT NOT NULL,
@@ -17,7 +16,6 @@ CREATE TABLE place_sub_types (
     FOREIGN KEY (sub_type_id) REFERENCES sub_types(sub_type_id)
 );
 
--- copy the current category and type of each place
 INSERT INTO place_categories (place_id, category_id)
 SELECT place_id, category_id FROM places;
 
