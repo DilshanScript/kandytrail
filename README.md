@@ -128,6 +128,16 @@ kandytrail/
    ```
    Open http://127.0.0.1:5000 in a browser. The admin panel is at http://127.0.0.1:5000/admin.
 
+## Demo admin login
+
+| | |
+|---|---|
+| Admin page | http://127.0.0.1:5000/admin |
+| Username | lecturer |
+| Password | KandyTrail2026 |
+
+This account is included in `database/kandytrail_full.sql` and is only for marking. You can also create your own admin with `python create_admin.py`.
+
 ## Testing
 
 Run the planner and routing checks with:
